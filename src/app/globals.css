@@ -1,0 +1,91 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-void: #04050a;
+  --color-ink: #e8ebf5;
+  --color-muted: #8b93a8;
+  --color-panel: #0c0e16;
+  --color-panel-2: #121522;
+  --color-line: #232842;
+  --color-cyan: #22e1ff;
+  --color-magenta: #ff3da6;
+  --color-violet: #9b6bff;
+  --color-lime: #b6ff3b;
+  --color-amber: #ffb547;
+
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-cyan) 40%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-cyan);
+  outline-offset: 2px;
+}
+
+/* Frosted glass used by every overlay surface. */
+.glass {
+  background: color-mix(in oklab, #0b0d16 78%, transparent);
+  border: 1px solid color-mix(in oklab, #ffffff 9%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+}
+
+.neon-text {
+  text-shadow:
+    0 0 12px color-mix(in oklab, currentColor 70%, transparent),
+    0 0 32px color-mix(in oklab, currentColor 35%, transparent);
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3050 transparent;
+}
+
+.prose-museum p {
+  margin: 0.75em 0;
+  line-height: 1.7;
+  color: #b7bfd3;
+}
+.prose-museum a {
+  color: var(--color-cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.prose-museum ul {
+  list-style: disc;
+  padding-left: 1.2em;
+  color: #b7bfd3;
+}
+.prose-museum h2,
+.prose-museum h3 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  margin-top: 1.4em;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
