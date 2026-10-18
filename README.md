@@ -12,7 +12,7 @@ Built with Next.js 16, React 19, React Three Fiber 9, drei, postprocessing, Zust
 
 ```bash
 npm install
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3917
 npm run build && npm start
 ```
 
