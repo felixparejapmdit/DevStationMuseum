@@ -1,10 +1,11 @@
-import { MOOD_ROOTS } from './theme'
+import { MOOD_ROOTS, type ThemeName } from './theme'
 import type { Zone } from './layout/layoutMuseum'
 
 /**
  * Fully procedural Web Audio ambience: no audio files to download.
- * Outside: wind + low city hum. Inside: a soft synth pad whose root changes per
- * room, sent through a generated reverb so each space sounds like a gallery.
+ * Outside: wind with birdsong by day, a low city hum at night. Inside: a soft pad
+ * whose root changes per room (warm triangle waves by day, synth saws at night),
+ * sent through a generated reverb so each space sounds like a gallery.
  */
 class MuseumAudio {
   private ctx: AudioContext | null = null
@@ -18,6 +19,11 @@ class MuseumAudio {
   private noise: AudioBuffer | null = null
   private muted = false
   private lastStep = 0
+  private theme: ThemeName = 'day'
+  private zone: Zone = 'courtyard'
+  private hum!: GainNode
+  private padRoot = MOOD_ROOTS[0]
+  private birds: ReturnType<typeof setInterval> | null = null
 
   start() {
     if (this.ctx) {
@@ -68,7 +74,10 @@ class MuseumAudio {
       wind.start()
       lfo.start()
 
-      // Distant city hum.
+      // Distant city hum (night).
+      this.hum = ctx.createGain()
+      this.hum.gain.value = this.theme === 'night' ? 1 : 0
+      this.hum.connect(this.outside)
       for (const [f, g] of [
         [55, 0.018],
         [110.4, 0.008],
@@ -77,9 +86,10 @@ class MuseumAudio {
         o.frequency.value = f
         const og = ctx.createGain()
         og.gain.value = g
-        o.connect(og).connect(this.outside)
+        o.connect(og).connect(this.hum)
         o.start()
       }
+      this.birds = setInterval(() => this.birdsong(), 3800)
       this.setPad(MOOD_ROOTS[0], 'init')
     } catch {
       this.ctx = null
@@ -117,6 +127,8 @@ class MuseumAudio {
     const ctx = this.ctx
     if (!ctx || key === this.padKey) return
     this.padKey = key
+    this.padRoot = root
+    const day = this.theme === 'day'
     const now = ctx.currentTime
     if (this.pad) {
       const old = this.pad
@@ -129,7 +141,7 @@ class MuseumAudio {
     gain.gain.setTargetAtTime(1, now, 0.8)
     const filter = ctx.createBiquadFilter()
     filter.type = 'lowpass'
-    filter.frequency.value = 520
+    filter.frequency.value = day ? 760 : 520
     filter.Q.value = 0.6
     filter.connect(gain).connect(this.inside)
     const nodes: AudioScheduledSourceNode[] = []
@@ -143,11 +155,11 @@ class MuseumAudio {
     ] as const) {
       for (const detune of [-7, 7]) {
         const o = ctx.createOscillator()
-        o.type = 'sawtooth'
+        o.type = day ? 'triangle' : 'sawtooth'
         o.frequency.value = root * ratio
         o.detune.value = detune
         const g = ctx.createGain()
-        g.gain.value = level * 0.5
+        g.gain.value = level * (day ? 0.55 : 0.5)
         o.connect(g).connect(filter)
         o.start()
         nodes.push(o)
@@ -160,6 +172,7 @@ class MuseumAudio {
   environment(zone: Zone, mood: number | null) {
     const ctx = this.ctx
     if (!ctx) return
+    this.zone = zone
     const now = ctx.currentTime
     const outside = zone === 'courtyard'
     this.outside.gain.setTargetAtTime(outside ? 1 : 0.06, now, 0.5)
@@ -260,6 +273,41 @@ class MuseumAudio {
       o.start(t)
       o.stop(t + 1)
     })
+  }
+
+  /** Day: a short phrase of birdsong now and then while outside. */
+  private birdsong() {
+    const ctx = this.ctx
+    if (!ctx || this.muted || this.theme !== 'day' || this.zone !== 'courtyard' || ctx.state !== 'running' || Math.random() < 0.35) return
+    const base = 2000 + Math.random() * 1400
+    const notes = 2 + Math.floor(Math.random() * 3)
+    for (let i = 0; i < notes; i++) {
+      const t = ctx.currentTime + i * (0.12 + Math.random() * 0.1)
+      const o = ctx.createOscillator()
+      o.frequency.setValueAtTime(base * (1 + i * 0.08), t)
+      o.frequency.exponentialRampToValueAtTime(base * 1.45, t + 0.04)
+      o.frequency.exponentialRampToValueAtTime(base * 0.85, t + 0.11)
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0, t)
+      g.gain.linearRampToValueAtTime(0.035, t + 0.01)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13)
+      const pan = ctx.createStereoPanner()
+      pan.pan.value = Math.random() * 1.6 - 0.8
+      o.connect(g).connect(pan).connect(this.outside)
+      o.start(t)
+      o.stop(t + 0.15)
+    }
+  }
+
+  /** Switch the soundscape between the daylit gallery and neon night. */
+  setTheme(theme: ThemeName) {
+    this.theme = theme
+    const ctx = this.ctx
+    if (!ctx) return
+    this.hum.gain.setTargetAtTime(theme === 'night' ? 1 : 0, ctx.currentTime, 0.5)
+    const root = this.padRoot
+    this.padKey = ''
+    this.setPad(root, `${theme}-${root}`)
   }
 
   mute(muted: boolean) {

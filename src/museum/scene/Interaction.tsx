@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { closeFocus, focusExhibit, goToRoom, pauseTour, stepExhibit } from '../actions'
 import { hasLineOfSight } from '../layout/collision'
 import { glideTo, look, player } from '../player'
-import { getMuseum } from '../store'
+import { getMuseum, getScene } from '../store'
 import { COLORS } from '../theme'
 
 type Hit = { kind: string; id?: string; room?: number; point: THREE.Vector3 }
@@ -231,6 +231,8 @@ export function FootCursor() {
     const g = ref.current
     if (!g) return
     const s = getMuseum()
+    const t = getScene()
+    mat.color.set(t.primary).multiplyScalar(t.name === 'day' ? 1 : 2.2)
     g.visible = hover.visible && !s.focused && s.transition === 'idle' && !s.tour.active
     g.position.set(hover.x, 0.02, hover.z)
     const k = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.06

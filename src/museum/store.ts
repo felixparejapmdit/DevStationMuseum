@@ -4,6 +4,7 @@ import type { GeneratedRoom } from './layout/buildRooms'
 import type { Location, MuseumLayout } from './layout/layoutMuseum'
 import type { TourStep } from './layout/tour'
 import type { Project } from '@/lib/types'
+import { SCENES, type ThemeName } from './theme'
 
 export type Tier = 'low' | 'medium' | 'high'
 export type NavMode = 'glide' | 'walk'
@@ -25,6 +26,8 @@ type MuseumState = {
   focused: string | null
   overlay: Overlay
   muted: boolean
+  /** Daylit gallery (default) or neon night mode. */
+  theme: ThemeName
   qualitySetting: 'auto' | Tier
   tier: Tier
   reducedMotion: boolean
@@ -52,6 +55,7 @@ export const useMuseum = create<MuseumState>()((set) => ({
   focused: null,
   overlay: null,
   muted: false,
+  theme: 'day',
   qualitySetting: 'auto',
   tier: 'high',
   reducedMotion: false,
@@ -71,3 +75,7 @@ export function inputBlocked(): boolean {
   const s = getMuseum()
   return !s.started || s.overlay !== null || s.transition !== 'idle' || s.focused !== null
 }
+
+/** Scene tokens for the active theme (materials, lights, lettering colours). */
+export const useScene = () => SCENES[useMuseum((s) => s.theme)]
+export const getScene = () => SCENES[getMuseum().theme]

@@ -1,17 +1,18 @@
 'use client'
 import { Command } from 'cmdk'
-import { DoorOpen, House, LayoutGrid, Map as MapIcon, Route, Search, Sparkles, Volume2 } from 'lucide-react'
+import { DoorOpen, House, LayoutGrid, Map as MapIcon, Moon, Route, Search, Sparkles, Volume2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { getMuseum, useMuseum } from '@/museum/store'
-import { focusExhibit, goToEntrance, goToRoom, startTour, toggleMute } from '@/museum/actions'
+import { roomColors } from '@/museum/theme'
+import { focusExhibit, goToEntrance, goToRoom, setTheme, startTour, toggleMute } from '@/museum/actions'
 
 function Item({ onSelect, value, children }: { onSelect: () => void; value: string; children: ReactNode }) {
   return (
     <Command.Item
       value={value}
       onSelect={onSelect}
-      className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink/90 data-[selected=true]:bg-white/8 data-[selected=true]:text-ink"
+      className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-ink/90 data-[selected=true]:bg-ink/8 data-[selected=true]:text-ink"
     >
       {children}
     </Command.Item>
@@ -25,6 +26,7 @@ export function CommandPalette() {
   const open = useMuseum((s) => s.overlay === 'search')
   const rooms = useMuseum((s) => s.rooms)
   const layout = useMuseum((s) => s.layout)
+  const theme = useMuseum((s) => s.theme)
   const router = useRouter()
   const close = () => getMuseum().set({ overlay: null })
   const run = (fn: () => void) => {
@@ -67,7 +69,7 @@ export function CommandPalette() {
           {rooms.flatMap((room) =>
             room.projects.map((p) => (
               <Item key={p.slug} value={`${p.title} ${p.tech.join(' ')} ${p.category} ${room.title}`} onSelect={() => run(() => void focusExhibit(p.slug))}>
-                <span className="size-2 shrink-0 rounded-full" style={{ background: room.accent, boxShadow: `0 0 8px ${room.accent}` }} />
+                <span className="size-2 shrink-0 rounded-full" style={{ background: roomColors(room, theme).accent }} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{p.title}</span>
                   <span className="block truncate text-xs text-muted">{p.tech.slice(0, 4).join(' · ') || p.tagline}</span>
@@ -81,7 +83,7 @@ export function CommandPalette() {
         <Command.Group heading="ROOMS" className={groupCls}>
           {layout?.rooms.map((r) => (
             <Item key={r.room.id} value={`room ${r.room.title} ${r.room.subtitle}`} onSelect={() => run(() => goToRoom(r.index))}>
-              <DoorOpen size={16} style={{ color: r.room.accent }} aria-hidden />
+              <DoorOpen size={16} style={{ color: roomColors(r.room, theme).accent }} aria-hidden />
               <span className="flex-1">{r.room.title}</span>
               <span className="font-mono text-xs text-muted">{r.exhibits.length} works</span>
             </Item>
@@ -102,6 +104,9 @@ export function CommandPalette() {
           </Item>
           <Item value="entrance courtyard home" onSelect={() => run(goToEntrance)}>
             <House size={16} aria-hidden /> Return to the entrance
+          </Item>
+          <Item value="theme night day light dark mode" onSelect={() => run(() => void setTheme(theme === 'day' ? 'night' : 'day'))}>
+            <Moon size={16} aria-hidden /> {theme === 'day' ? 'Switch to night mode' : 'Switch to daylight'}
           </Item>
           <Item value="sound mute audio" onSelect={() => run(toggleMute)}>
             <Volume2 size={16} aria-hidden /> Toggle sound

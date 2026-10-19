@@ -9,7 +9,7 @@ export function TourBar() {
   const total = useMuseum((s) => s.tourSteps.filter((t) => t.kind === 'focus').length)
   const steps = useMuseum((s) => s.tourSteps)
   const done = steps.slice(0, tour.index).filter((t) => t.kind === 'focus').length
-  const btn = 'grid size-9 place-items-center rounded-full text-ink hover:bg-white/10'
+  const btn = 'grid size-9 place-items-center rounded-full text-ink hover:bg-ink/10'
   return (
     <AnimatePresence>
       {tour.active && (
@@ -22,7 +22,7 @@ export function TourBar() {
           aria-label="Guided tour controls"
         >
           <div className="mr-2 min-w-0">
-            <p className="font-mono text-[9px] tracking-[0.3em] text-magenta">GUIDED TOUR · {done}/{total}</p>
+            <p className="font-mono text-[9px] tracking-[0.3em] text-secondary">GUIDED TOUR · {done}/{total}</p>
             <p className="max-w-[11rem] truncate text-sm text-ink sm:max-w-[16rem]">{tour.paused ? 'Paused, explore freely' : tour.label || 'On the move…'}</p>
           </div>
           <button type="button" className={btn} onClick={() => void skipTour(-1)} aria-label="Previous stop">

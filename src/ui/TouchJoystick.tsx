@@ -38,7 +38,7 @@ export function TouchJoystick() {
 
   return (
     <div
-      className="absolute bottom-6 left-6 z-20 grid size-32 touch-none place-items-center rounded-full border border-white/10 bg-panel/40 backdrop-blur-md"
+      className="absolute bottom-6 left-6 z-20 grid size-32 touch-none place-items-center rounded-full border border-ink/10 bg-panel/40 backdrop-blur-md"
       role="application"
       aria-label="Movement joystick"
       onPointerDown={(e) => {
@@ -55,7 +55,7 @@ export function TouchJoystick() {
       onPointerCancel={end}
     >
       <div
-        className="size-14 rounded-full border border-cyan/60 bg-cyan/15 shadow-[0_0_24px_rgba(34,225,255,0.35)]"
+        className="size-14 rounded-full border border-primary/60 bg-primary/15 shadow-[0_0_24px_rgb(var(--primary-rgb)/0.35)]"
         style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }}
       />
     </div>

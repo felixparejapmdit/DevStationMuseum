@@ -28,11 +28,11 @@ export function Welcome({ onEnter, initial }: { onEnter: (tour?: boolean) => voi
         initial={{ y: 24, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
-        className="glass w-full max-w-xl rounded-3xl p-7 shadow-[0_30px_120px_-20px_rgba(34,225,255,0.25)] sm:p-10"
+        className="glass w-full max-w-xl rounded-3xl p-7 shadow-[0_30px_120px_-20px_rgb(var(--primary-rgb)/0.25)] sm:p-10"
       >
-        <p className="font-mono text-[11px] tracking-[0.35em] text-cyan">PORTFOLIO MUSEUM</p>
+        <p className="font-mono text-[11px] tracking-[0.35em] text-primary">PORTFOLIO MUSEUM</p>
         <h2 id="welcome-title" className="mt-3 font-display text-4xl font-bold leading-[1.05] sm:text-5xl">
-          <span className="neon-text text-magenta">{site.shortName}</span>
+          <span className="neon-text text-secondary">{site.shortName}</span>
           <span className="mt-2 block text-ink">{site.museumName}</span>
         </h2>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">{site.tagline}</p>
@@ -54,7 +54,7 @@ export function Welcome({ onEnter, initial }: { onEnter: (tour?: boolean) => voi
         </dl>
 
         {(target || targetRoom) && (
-          <p className="mt-5 rounded-xl border border-cyan/30 bg-cyan/5 px-4 py-3 text-sm text-ink">
+          <p className="mt-5 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-ink">
             Your link opens {target ? <strong>{target.title}</strong> : <>the <strong>{targetRoom!.title}</strong> room</>}.
           </p>
         )}
@@ -64,7 +64,7 @@ export function Welcome({ onEnter, initial }: { onEnter: (tour?: boolean) => voi
             type="button"
             disabled={!ready}
             onClick={() => onEnter(false)}
-            className="group inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-cyan px-6 py-3.5 font-semibold text-void shadow-[0_0_30px_rgba(34,225,255,0.45)] transition hover:shadow-[0_0_44px_rgba(34,225,255,0.7)] disabled:cursor-wait disabled:opacity-60"
+            className="group inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-primary px-6 py-3.5 font-semibold text-(--on-primary) shadow-[0_0_30px_rgb(var(--primary-rgb)/0.45)] transition hover:shadow-[0_0_44px_rgb(var(--primary-rgb)/0.7)] disabled:cursor-wait disabled:opacity-60"
           >
             {ready ? (target ? 'Enter at this work' : 'Enter the museum') : 'Opening the doors…'}
             <ArrowRight size={18} className="transition group-hover:translate-x-0.5" aria-hidden />
@@ -73,7 +73,7 @@ export function Welcome({ onEnter, initial }: { onEnter: (tour?: boolean) => voi
             type="button"
             disabled={!ready}
             onClick={() => onEnter(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-line bg-panel-2/80 px-5 py-3.5 font-medium text-ink transition hover:border-magenta/60 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-line bg-panel-2/80 px-5 py-3.5 font-medium text-ink transition hover:border-secondary/60 disabled:opacity-50"
           >
             <Route size={17} aria-hidden /> Guided tour
           </button>

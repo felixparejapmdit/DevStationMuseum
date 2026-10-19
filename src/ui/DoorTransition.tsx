@@ -10,10 +10,10 @@ export function DoorTransition() {
   return (
     <div className={`absolute inset-0 z-[60] overflow-hidden ${phase === 'idle' ? 'pointer-events-none' : ''}`} aria-hidden={phase === 'idle'}>
       <div
-        className={`absolute inset-y-0 left-0 w-[50.5%] border-r-2 border-cyan bg-gradient-to-r from-[#07080f] to-[#10131f] shadow-[4px_0_30px_rgba(34,225,255,0.5)] ${ease} ${closed ? 'translate-x-0' : '-translate-x-[105%]'}`}
+        className={`absolute inset-y-0 left-0 w-[50.5%] border-r-2 border-primary bg-gradient-to-r from-panel to-panel-2 shadow-[4px_0_30px_rgb(var(--primary-rgb)/0.5)] ${ease} ${closed ? 'translate-x-0' : '-translate-x-[105%]'}`}
       />
       <div
-        className={`absolute inset-y-0 right-0 w-[50.5%] border-l-2 border-magenta bg-gradient-to-l from-[#07080f] to-[#10131f] shadow-[-4px_0_30px_rgba(255,61,166,0.5)] ${ease} ${closed ? 'translate-x-0' : 'translate-x-[105%]'}`}
+        className={`absolute inset-y-0 right-0 w-[50.5%] border-l-2 border-secondary bg-gradient-to-l from-panel to-panel-2 shadow-[-4px_0_30px_rgb(var(--secondary-rgb)/0.5)] ${ease} ${closed ? 'translate-x-0' : 'translate-x-[105%]'}`}
       />
       {closed && label && (
         <p role="status" className="absolute inset-0 grid place-items-center font-mono text-xs tracking-[0.35em] text-ink">

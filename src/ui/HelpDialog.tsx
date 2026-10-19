@@ -14,6 +14,7 @@ const ROWS: [string, string][] = [
   ['Ctrl / ⌘ K  or  /', 'Search works & rooms'],
   ['T', 'Start / stop the guided tour'],
   ['N', 'Mute / unmute'],
+  ['L', 'Daylight / night mode'],
   ['Esc', 'Close / step back'],
 ]
 
@@ -41,10 +42,10 @@ export function HelpDialog() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-mono text-[10px] tracking-[0.3em] text-cyan">HOW TO VISIT</p>
+                <p className="font-mono text-[10px] tracking-[0.3em] text-primary">HOW TO VISIT</p>
                 <h2 id="help-title" className="mt-1 font-display text-2xl font-semibold">Explore at your own pace</h2>
               </div>
-              <button type="button" onClick={close} className="rounded-full p-2 text-muted hover:bg-white/5 hover:text-ink" aria-label="Close help">
+              <button type="button" onClick={close} className="rounded-full p-2 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close help">
                 <X size={18} />
               </button>
             </div>

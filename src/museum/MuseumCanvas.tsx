@@ -5,7 +5,7 @@ import { portraitFov } from './actions'
 import { Suspense, useEffect } from 'react'
 import * as THREE from 'three'
 import { EYE } from './player'
-import { getMuseum, useMuseum, type Tier } from './store'
+import { getMuseum, useMuseum, useScene, type Tier } from './store'
 import { COLORS } from './theme'
 import { Courtyard } from './scene/Courtyard'
 import { Effects } from './scene/Effects'
@@ -52,9 +52,62 @@ function adjustTier(dir: 'up' | 'down') {
   if (next !== s.tier) s.set({ tier: next })
 }
 
+/** Sky, fog, sun and fill light for the active theme. */
+function Atmosphere() {
+  const t = useScene()
+  const tier = useMuseum((s) => s.tier)
+  const gl = useThree((s) => s.gl)
+  useEffect(() => {
+    gl.toneMappingExposure = t.exposure
+  }, [gl, t.exposure])
+  const shadows = t.sun.shadows && tier !== 'low'
+  return (
+    <>
+      <color attach="background" args={[t.background]} />
+      <fog attach="fog" args={t.fog} />
+      <ambientLight intensity={t.ambient[1]} color={t.ambient[0]} />
+      <hemisphereLight args={t.hemisphere} />
+      <directionalLight
+        position={t.sun.position}
+        intensity={t.sun.intensity}
+        color={t.sun.color}
+        castShadow={shadows}
+        shadow-mapSize={[tier === 'high' ? 2048 : 1024, tier === 'high' ? 2048 : 1024]}
+        shadow-camera-left={-34}
+        shadow-camera-right={34}
+        shadow-camera-top={34}
+        shadow-camera-bottom={-34}
+        shadow-camera-near={1}
+        shadow-camera-far={140}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.03}
+      />
+      <Environment resolution={128} frames={1}>
+        {t.name === 'day' ? (
+          <>
+            {/* Soft gallery daylight: a bright sky panel and warm bounce from the floor. */}
+            <Lightformer form="rect" intensity={1.6} color="#ffffff" position={[0, 10, 0]} rotation-x={Math.PI / 2} scale={[16, 16, 1]} />
+            <Lightformer form="rect" intensity={0.6} color="#ffe9cf" position={[0, -4, 0]} rotation-x={-Math.PI / 2} scale={[20, 20, 1]} />
+            <Lightformer form="rect" intensity={0.8} color="#eef3ff" position={[-10, 3, 0]} rotation-y={Math.PI / 2} scale={[20, 4, 1]} />
+          </>
+        ) : (
+          <>
+            {/* Kept low: these only add glints to metal and the floor, not overall colour. */}
+            <Lightformer form="ring" intensity={2} color={COLORS.cyan} position={[0, 6, -12]} scale={6} />
+            <Lightformer form="rect" intensity={1} color={COLORS.magenta} position={[-10, 3, 0]} rotation-y={Math.PI / 2} scale={[20, 1, 1]} />
+            <Lightformer form="rect" intensity={1} color={COLORS.violet} position={[10, 3, 0]} rotation-y={-Math.PI / 2} scale={[20, 1, 1]} />
+            <Lightformer form="rect" intensity={0.8} color="#ffffff" position={[0, 10, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} />
+          </>
+        )}
+      </Environment>
+    </>
+  )
+}
+
 export default function MuseumCanvas() {
   const layout = useMuseum((s) => s.layout)
   const tier = useMuseum((s) => s.tier)
+  const theme = useMuseum((s) => s.theme)
   const nearRooms = useMuseum((s) => s.nearRooms)
   if (!layout) return null
   const spawn = layout.spawn
@@ -62,47 +115,42 @@ export default function MuseumCanvas() {
   return (
     <Canvas
       dpr={DPR[tier]}
+      shadows="percentage"
       gl={{ antialias: tier === 'low', powerPreference: 'high-performance', stencil: false }}
       camera={{ fov: 62, near: 0.05, far: 220, position: [spawn.x, EYE, spawn.z] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.NeutralToneMapping
-        gl.toneMappingExposure = 1.05
       }}
       style={{ position: 'absolute', inset: 0 }}
     >
-      <color attach="background" args={[COLORS.void]} />
-      <fog attach="fog" args={[COLORS.void, 26, 120]} />
-      <ambientLight intensity={0.45} color="#8a96ff" />
-      <hemisphereLight args={['#5463d8', '#0a0510', 0.55]} />
-      <directionalLight position={[-20, 30, 40]} intensity={0.4} color="#9fb0ff" />
-
       <PerformanceMonitor onDecline={() => adjustTier('down')} onIncline={() => adjustTier('up')} flipflops={3} onFallback={() => getMuseum().set({ tier: 'low' })} />
 
+      {/* Background / fog attach to the scene itself, so the atmosphere stays at the root. */}
       <Suspense fallback={null}>
-        <Environment resolution={128} frames={1}>
-          {/* Kept low: these only add glints to metal and the floor, not overall colour. */}
-          <Lightformer form="ring" intensity={2} color={COLORS.cyan} position={[0, 6, -12]} scale={6} />
-          <Lightformer form="rect" intensity={1} color={COLORS.magenta} position={[-10, 3, 0]} rotation-y={Math.PI / 2} scale={[20, 1, 1]} />
-          <Lightformer form="rect" intensity={1} color={COLORS.violet} position={[10, 3, 0]} rotation-y={-Math.PI / 2} scale={[20, 1, 1]} />
-          <Lightformer form="rect" intensity={0.8} color="#ffffff" position={[0, 10, 0]} rotation-x={Math.PI / 2} scale={[10, 10, 1]} />
-        </Environment>
-        <Courtyard />
-        <InteriorFloor layout={layout} />
-        <Interior layout={layout} />
-        <SceneReady />
+        <Atmosphere key={theme} />
       </Suspense>
-      {nearRooms.map((i) => (
-        <Suspense key={layout.rooms[i].room.id} fallback={null}>
-          <Room layout={layout.rooms[i]} />
+
+      {/* Keyed by theme: switching day/night rebuilds materials, lights and posters cleanly. */}
+      <group key={theme}>
+        <Suspense fallback={null}>
+          <Courtyard />
+          <InteriorFloor layout={layout} />
+          <Interior layout={layout} />
+          <SceneReady />
         </Suspense>
-      ))}
+        {nearRooms.map((i) => (
+          <Suspense key={layout.rooms[i].room.id} fallback={null}>
+            <Room layout={layout.rooms[i]} />
+          </Suspense>
+        ))}
+        <LightPool layout={layout} />
+      </group>
 
       <ResponsiveFov />
-      <LightPool layout={layout} />
       <PlayerRig />
       <Interaction />
       <FootCursor />
-      {tier !== 'low' && <Effects tier={tier} />}
+      {tier !== 'low' && <Effects key={theme} tier={tier} />}
     </Canvas>
   )
 }

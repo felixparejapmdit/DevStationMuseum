@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getMuseumData } from '@/lib/content'
 import { site } from '@/site.config'
 import { PosterArt } from '@/ui/PosterArt'
+import { roomCssVars } from '@/museum/theme'
 
 export const metadata: Metadata = {
   title: 'The collection',
@@ -16,7 +17,7 @@ export default function ProjectsPage() {
     <main className="mx-auto max-w-6xl px-4 pt-10 pb-24 sm:px-8">
       <header className="flex flex-col gap-6 border-b border-line pb-10 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="font-mono text-[11px] tracking-[0.35em] text-cyan">{site.museumName.toUpperCase()}</p>
+          <p className="font-mono text-[11px] tracking-[0.35em] text-primary">{site.museumName.toUpperCase()}</p>
           <h1 className="mt-3 font-display text-4xl font-bold sm:text-5xl">
             The collection <span className="text-muted">· {projects.length} works</span>
           </h1>
@@ -24,18 +25,18 @@ export default function ProjectsPage() {
         </div>
         <Link
           href="/"
-          className="inline-flex items-center justify-center rounded-full bg-cyan px-5 py-3 text-sm font-semibold text-void shadow-[0_0_30px_rgba(34,225,255,0.4)]"
+          className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-semibold text-(--on-primary) shadow-[0_0_30px_rgb(var(--primary-rgb)/0.4)]"
         >
           Walk through the museum →
         </Link>
       </header>
 
       {rooms.map((room, ri) => (
-        <section key={room.id} className="mt-14" aria-labelledby={`room-${room.id}`}>
+        <section key={room.id} className="room-vars mt-14" style={roomCssVars(room)} aria-labelledby={`room-${room.id}`}>
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <div>
               <p className="font-mono text-[10px] tracking-[0.3em] text-muted">ROOM {String(ri + 1).padStart(2, '0')}</p>
-              <h2 id={`room-${room.id}`} className="mt-1 font-display text-2xl font-semibold" style={{ color: room.accent }}>
+              <h2 id={`room-${room.id}`} className="mt-1 font-display text-2xl font-semibold" style={{ color: 'var(--room)' }}>
                 {room.title}
               </h2>
               <p className="mt-1 text-sm text-muted">{room.subtitle}</p>
@@ -53,10 +54,9 @@ export default function ProjectsPage() {
                   <Link
                     href={`/projects/${p.slug}`}
                     className="group block overflow-hidden rounded-2xl border border-line bg-panel transition hover:-translate-y-0.5"
-                    style={{ ['--accent' as string]: room.accent }}
                   >
-                    <div className="overflow-hidden transition group-hover:shadow-[0_0_40px_-10px_var(--accent)]">
-                      <PosterArt project={p} accent={room.accent} secondary={room.secondary} number={number} />
+                    <div className="overflow-hidden transition group-hover:shadow-[0_18px_40px_-18px_var(--room)]">
+                      <PosterArt project={p} number={number} vars={roomCssVars(room)} />
                     </div>
                     <div className="p-4">
                       <h3 className="font-display text-lg font-semibold">{p.title}</h3>

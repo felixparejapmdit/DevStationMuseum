@@ -5,6 +5,7 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useEffect, useRef, useState } from 'react'
 import { useMuseum } from '@/museum/store'
+import { roomColors, roomCssVars } from '@/museum/theme'
 import { closeFocus, pathFor, stepExhibit } from '@/museum/actions'
 import { PosterArt } from './PosterArt'
 
@@ -14,6 +15,7 @@ export function ExhibitPanel() {
   const projects = useMuseum((s) => s.projects)
   const rooms = useMuseum((s) => s.rooms)
   const touring = useMuseum((s) => s.tour.active)
+  const theme = useMuseum((s) => s.theme)
   const ex = focused && layout ? layout.exhibits[focused] : null
   const project = ex ? projects[ex.slug] : null
   const roomIndex = ex ? (ex.roomIndex ?? rooms.findIndex((r) => r.projects.some((p) => p.slug === ex.slug))) : -1
@@ -37,7 +39,8 @@ export function ExhibitPanel() {
     } catch {}
   }
 
-  const accent = room?.accent ?? '#22e1ff'
+  const accent = room ? roomColors(room, theme).accent : 'var(--color-primary)'
+  const day = theme === 'day'
 
   return (
     <AnimatePresence>
@@ -53,7 +56,7 @@ export function ExhibitPanel() {
           exit={{ opacity: 0, x: 40 }}
           transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
           className="glass scrollbar-thin absolute inset-x-2 bottom-2 z-30 max-h-[48dvh] overflow-y-auto rounded-3xl outline-none sm:inset-x-auto sm:top-20 sm:right-4 sm:bottom-4 sm:max-h-none sm:w-[26rem]"
-          style={{ boxShadow: `0 0 60px -20px ${accent}` }}
+          style={day ? undefined : { boxShadow: `0 0 60px -20px ${accent}` }}
         >
           <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-panel/80 px-5 py-3 backdrop-blur-md">
             <p className="truncate font-mono text-[10px] tracking-[0.28em]" style={{ color: accent }}>
@@ -62,15 +65,15 @@ export function ExhibitPanel() {
             <div className="flex items-center gap-1">
               {!touring && (
                 <>
-                  <button type="button" onClick={() => stepExhibit(-1)} className="rounded-full p-2 text-muted hover:bg-white/5 hover:text-ink" aria-label="Previous work">
+                  <button type="button" onClick={() => stepExhibit(-1)} className="rounded-full p-2 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Previous work">
                     <ChevronLeft size={17} />
                   </button>
-                  <button type="button" onClick={() => stepExhibit(1)} className="rounded-full p-2 text-muted hover:bg-white/5 hover:text-ink" aria-label="Next work">
+                  <button type="button" onClick={() => stepExhibit(1)} className="rounded-full p-2 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Next work">
                     <ChevronRight size={17} />
                   </button>
                 </>
               )}
-              <button type="button" onClick={closeFocus} className="rounded-full p-2 text-muted hover:bg-white/5 hover:text-ink" aria-label="Close (Esc)">
+              <button type="button" onClick={closeFocus} className="rounded-full p-2 text-muted hover:bg-ink/5 hover:text-ink" aria-label="Close (Esc)">
                 <X size={17} />
               </button>
             </div>
@@ -89,7 +92,7 @@ export function ExhibitPanel() {
               ) : project.media.loop ? (
                 <video src={project.media.loop} poster={project.media.poster} className="aspect-[16/10] w-full object-cover object-top" autoPlay muted loop playsInline />
               ) : (
-                <PosterArt project={project} accent={accent} secondary={room?.secondary ?? '#9b6bff'} number={ex.number} />
+                <PosterArt project={project} number={ex.number} vars={room ? roomCssVars(room) : {}} />
               )}
             </div>
 
@@ -110,7 +113,7 @@ export function ExhibitPanel() {
             {project.tech.length > 0 && (
               <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Technology">
                 {project.tech.map((t) => (
-                  <li key={t} className="rounded-full border px-2.5 py-1 font-mono text-[11px] text-ink/90" style={{ borderColor: accent + '55' }}>
+                  <li key={t} className="rounded-full border px-2.5 py-1 font-mono text-[11px] text-ink/90" style={{ borderColor: `color-mix(in oklab, ${accent} 35%, transparent)` }}>
                     {t}
                   </li>
                 ))}
@@ -123,8 +126,8 @@ export function ExhibitPanel() {
                   href={project.links.live}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-void"
-                  style={{ background: accent, boxShadow: `0 0 24px ${accent}66` }}
+                  className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-white"
+                  style={{ background: accent, color: day ? '#ffffff' : '#04050a', boxShadow: day ? undefined : `0 0 24px ${accent}66` }}
                 >
                   Visit live site <ExternalLink size={15} aria-hidden />
                 </a>
@@ -136,17 +139,17 @@ export function ExhibitPanel() {
                   type="button"
                   onClick={() => setPreview((v) => !v)}
                   aria-pressed={preview}
-                  className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-white/30"
+                  className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-ink/30"
                 >
                   <Eye size={15} aria-hidden /> {preview ? 'Show capture' : 'Live preview'}
                 </button>
               )}
               {project.links.repo && (
-                <a href={project.links.repo} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-white/30">
+                <a href={project.links.repo} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-ink/30">
                   <CodeXml size={15} aria-hidden /> Source
                 </a>
               )}
-              <button type="button" onClick={copyLink} className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-white/30">
+              <button type="button" onClick={copyLink} className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-sm hover:border-ink/30">
                 {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />} {copied ? 'Copied' : 'Copy link'}
               </button>
             </div>

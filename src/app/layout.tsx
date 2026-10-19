@@ -35,11 +35,17 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image' },
 }
 
-export const viewport: Viewport = { themeColor: '#04050a', width: 'device-width', initialScale: 1, viewportFit: 'cover' }
+export const viewport: Viewport = { themeColor: '#f4f2ed', width: 'device-width', initialScale: 1, viewportFit: 'cover' }
+
+// Applies the saved day / night choice before first paint (no flash of the wrong theme).
+const themeScript = `try{var t=localStorage.getItem('museum:theme');if(t==='night'||t==='day')document.documentElement.dataset.theme=t}catch(e){}`
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="en" data-theme="day" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-dvh antialiased">
         {children}
         {/* Only on Vercel deployments: elsewhere the script 404s and logs to the console. */}

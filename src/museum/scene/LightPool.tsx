@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import type { LightAnchor, MuseumLayout } from '../layout/layoutMuseum'
 import { player } from '../player'
+import { getScene } from '../store'
 
 const POOL = 6
 
@@ -52,14 +53,14 @@ export function LightPool({ layout }: { layout: MuseumLayout }) {
           assigned.current[i] = next
           pending.current[i] = null
           light.position.set(next.x, next.y, next.z)
-          light.color.set(next.color)
+          light.color.set(getScene().poolColor(next.color))
           light.distance = next.distance
         }
       } else if (cur && pending.current[i] === null && !isStillNear(cur)) {
         light.intensity = Math.max(0, light.intensity - dt * 60)
         if (light.intensity <= 0.01) assigned.current[i] = null
       } else if (cur) {
-        light.intensity += (cur.intensity - light.intensity) * Math.min(1, dt * 4)
+        light.intensity += (cur.intensity * getScene().poolScale - light.intensity) * Math.min(1, dt * 4)
       }
     }
   })

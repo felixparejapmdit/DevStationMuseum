@@ -1,29 +1,68 @@
 'use client'
 import { Grid, MeshReflectorMaterial } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { site } from '@/site.config'
 import { DIMS, wallWithGaps, type MuseumLayout } from '../layout/layoutMuseum'
-import { getMuseum, useMuseum } from '../store'
+import { getMuseum, useMuseum, useScene } from '../store'
 import { player } from '../player'
-import { COLORS } from '../theme'
+import { COLORS, roomColors, type SceneTheme } from '../theme'
 import { Exhibit } from './Exhibit'
-import { additive, coneTexture, MAT, neon, noRaycast } from './materials'
+import { additive, coneTexture, lightMat, lineMat, mats, neon, noRaycast, standard, terrazzoTexture, woodTexture } from './materials'
 import { Block, Label, NeonBar, NeonText, Plant } from './primitives'
 
 const { hall, rotunda, gallery, room } = DIMS
 
+/** A repeating copy of a shared texture (each surface needs its own repeat). */
+function useTiled(make: () => THREE.Texture, repeatX: number, repeatY: number) {
+  const tex = useMemo(() => {
+    const t = make().clone()
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.repeat.set(repeatX, repeatY)
+    t.needsUpdate = true
+    return t
+  }, [make, repeatX, repeatY])
+  useEffect(() => () => tex.dispose(), [tex])
+  return tex
+}
+
+const brass = (t: SceneTheme) => (t.name === 'day' ? standard('#b8954f', 0.35, 0.85) : null)
+
 // ── Floor ──────────────────────────────────────────────────────────────────
+function DayFloor({ length, z }: { length: number; z: number }) {
+  const wood = useTiled(woodTexture, 32 / 2.4, length / 2.4)
+  const terrazzoDisc = useTiled(terrazzoTexture, 4, 4)
+  const terrazzoHall = useTiled(terrazzoTexture, 1.6, 2.6)
+  return (
+    <group>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, z]} userData={{ kind: 'floor' }}>
+        <planeGeometry args={[32, length]} />
+        <meshStandardMaterial map={wood} color="#ffffff" roughness={0.48} metalness={0} envMapIntensity={0.6} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[rotunda.cx, 0.002, rotunda.cz]} userData={{ kind: 'floor' }}>
+        <circleGeometry args={[rotunda.r, 96]} />
+        <meshStandardMaterial map={terrazzoDisc} roughness={0.35} envMapIntensity={0.7} />
+      </mesh>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.002, (hall.z0 + hall.z1) / 2]} userData={{ kind: 'floor' }}>
+        <planeGeometry args={[hall.halfW * 2, hall.z0 - hall.z1]} />
+        <meshStandardMaterial map={terrazzoHall} roughness={0.35} envMapIntensity={0.7} />
+      </mesh>
+    </group>
+  )
+}
+
 export function InteriorFloor({ layout }: { layout: MuseumLayout }) {
   const tier = useMuseum((s) => s.tier)
+  const t = useScene()
   const z0 = hall.z0
   const z1 = layout.galleryEndZ - 1
   const length = z0 - z1
-  const position: [number, number, number] = [0, 0, (z0 + z1) / 2]
+  const z = (z0 + z1) / 2
+  if (t.name === 'day') return <DayFloor length={length} z={z} />
   return (
     <group>
-      <mesh rotation-x={-Math.PI / 2} position={position} userData={{ kind: 'floor' }}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0, z]} userData={{ kind: 'floor' }}>
         <planeGeometry args={[32, length]} />
         {tier === 'high' ? (
           <MeshReflectorMaterial
@@ -41,25 +80,16 @@ export function InteriorFloor({ layout }: { layout: MuseumLayout }) {
             mirror={0.6}
           />
         ) : (
-          <meshStandardMaterial color="#0b0c14" roughness={0.42} metalness={0.2} envMapIntensity={0.28} />
+          <meshStandardMaterial color={t.floor} roughness={0.42} metalness={0.2} envMapIntensity={0.28} />
         )}
       </mesh>
-      <Grid
-        position={[0, 0.003, position[2]]}
-        args={[32, length]}
-        cellSize={1.2}
-        cellThickness={0.6}
-        cellColor="#161a2c"
-        sectionSize={0}
-        fadeDistance={36}
-        fadeStrength={1.2}
-        raycast={noRaycast}
-      />
+      <Grid position={[0, 0.003, z]} args={[32, length]} cellSize={1.2} cellThickness={0.6} cellColor="#161a2c" sectionSize={0} fadeDistance={36} fadeStrength={1.2} raycast={noRaycast} />
     </group>
   )
 }
 
 // ── Entrance hall ─────────────────────────────────────────────────────────
+/** Night only: neon arches that brighten as you walk under them. */
 function Arch({ z, color }: { z: number; color: string }) {
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(0.06) }), [color])
   const base = useMemo(() => new THREE.Color(color), [color])
@@ -85,36 +115,41 @@ function Arch({ z, color }: { z: number; color: string }) {
 }
 
 function EntranceHall({ works, rooms }: { works: number; rooms: number }) {
+  const t = useScene()
+  const m = mats(t)
+  const day = t.name === 'day'
   const len = hall.z0 - hall.z1
   const midZ = (hall.z0 + hall.z1) / 2
   return (
     <group>
       {[-1, 1].map((s) => (
-        <Block key={s} size={[0.3, hall.h, len]} position={[s * (hall.halfW + 0.15), hall.h / 2, midZ]} material={MAT.wall()} />
+        <Block key={s} size={[0.3, hall.h, len]} position={[s * (hall.halfW + 0.15), hall.h / 2, midZ]} material={m.wall} />
       ))}
-      <mesh position={[0, hall.h, midZ]} rotation-x={Math.PI / 2} material={MAT.ceiling()}>
+      <mesh position={[0, hall.h, midZ]} rotation-x={Math.PI / 2} material={m.ceiling}>
         <planeGeometry args={[hall.halfW * 2, len]} />
       </mesh>
-      {[6.6, 4.4, 2.2, 0, -2.2, -4.4].map((z, i) => (
-        <Arch key={z} z={z} color={i % 2 ? COLORS.magenta : COLORS.cyan} />
-      ))}
+      {day ? (
+        <NeonBar kind="light" size={[1.6, 0.02, len - 1.6]} position={[0, hall.h - 0.02, midZ]} color="#ffffff" />
+      ) : (
+        [6.6, 4.4, 2.2, 0, -2.2, -4.4].map((z, i) => <Arch key={z} z={z} color={i % 2 ? COLORS.magenta : COLORS.cyan} />)
+      )}
       {[-1, 1].map((s) => (
-        <NeonBar key={s} size={[0.02, 0.035, len]} position={[s * (hall.halfW - 0.01), 0.03, midZ]} color={COLORS.violet} intensity={2} />
+        <NeonBar key={s} size={[0.02, 0.035, len]} position={[s * (hall.halfW - 0.01), 0.03, midZ]} color={t.tertiary} intensity={day ? undefined : 2} />
       ))}
 
       {/* Left wall: about the maker */}
       <group position={[-hall.halfW + 0.02, 0, 1.4]} rotation-y={Math.PI / 2}>
-        <Label font="mono" fontSize={0.13} color={COLORS.cyan} letterSpacing={0.3} anchorX="left" position={[-2.6, 3.35, 0]}>
+        <Label font="mono" fontSize={0.13} color={t.primary} letterSpacing={0.3} anchorX="left" position={[-2.6, 3.35, 0]}>
           HELLO, I&apos;M
         </Label>
-        <Label font="display" fontSize={0.52} color="#f2f4fb" anchorX="left" position={[-2.6, 2.9, 0]}>
+        <Label font="display" fontSize={0.52} anchorX="left" position={[-2.6, 2.9, 0]}>
           {site.name}
         </Label>
-        <NeonText color={COLORS.magenta} font="displayMedium" fontSize={0.2} anchorX="left" position={[-2.6, 2.45, 0]} intensity={2}>
+        <NeonText color={t.secondary} font="displayMedium" fontSize={0.2} anchorX="left" position={[-2.6, 2.45, 0]} intensity={2}>
           {site.role}
         </NeonText>
         {site.about.map((line, i) => (
-          <Label key={i} fontSize={0.12} color="#a9b1c6" anchorX="left" anchorY="top" maxWidth={5.2} lineHeight={1.45} position={[-2.6, 2.12 - i * 0.62, 0]}>
+          <Label key={i} fontSize={0.12} color={t.inkMuted} anchorX="left" anchorY="top" maxWidth={5.2} lineHeight={1.45} position={[-2.6, 2.12 - i * 0.62, 0]}>
             {line}
           </Label>
         ))}
@@ -122,19 +157,19 @@ function EntranceHall({ works, rooms }: { works: number; rooms: number }) {
 
       {/* Right wall: the collection */}
       <group position={[hall.halfW - 0.02, 0, 1.4]} rotation-y={-Math.PI / 2}>
-        <Label font="mono" fontSize={0.13} color={COLORS.violet} letterSpacing={0.3} anchorX="left" position={[-2.6, 3.35, 0]}>
+        <Label font="mono" fontSize={0.13} color={t.tertiary} letterSpacing={0.3} anchorX="left" position={[-2.6, 3.35, 0]}>
           THE COLLECTION
         </Label>
-        <NeonText color={COLORS.cyan} fontSize={0.44} anchorX="left" position={[-2.6, 2.9, 0]}>
+        <NeonText color={t.primary} fontSize={0.44} anchorX="left" position={[-2.6, 2.9, 0]}>
           {site.museumName}
         </NeonText>
-        <Label font="mono" fontSize={0.15} color="#e8ebf5" anchorX="left" letterSpacing={0.12} position={[-2.6, 2.4, 0]}>
+        <Label font="mono" fontSize={0.15} anchorX="left" letterSpacing={0.12} position={[-2.6, 2.4, 0]}>
           {`${works} WORKS  ·  ${rooms} ROOMS`}
         </Label>
-        <Label fontSize={0.12} color="#a9b1c6" anchorX="left" anchorY="top" maxWidth={5.2} lineHeight={1.45} position={[-2.6, 2.1, 0]}>
+        <Label fontSize={0.12} color={t.inkMuted} anchorX="left" anchorY="top" maxWidth={5.2} lineHeight={1.45} position={[-2.6, 2.1, 0]}>
           {site.tagline}
         </Label>
-        <Label font="mono" fontSize={0.095} color="#7d859b" anchorX="left" position={[-2.6, 1.45, 0]} letterSpacing={0.08}>
+        <Label font="mono" fontSize={0.095} color={t.inkMuted} anchorX="left" position={[-2.6, 1.45, 0]} letterSpacing={0.08}>
           M  MAP   ·   CTRL/⌘ K  SEARCH   ·   T  GUIDED TOUR
         </Label>
       </group>
@@ -144,86 +179,98 @@ function EntranceHall({ works, rooms }: { works: number; rooms: number }) {
 
 // ── Rotunda ───────────────────────────────────────────────────────────────
 function Sculpture() {
+  const t = useScene()
+  const m = mats(t)
+  const day = t.name === 'day'
   const group = useRef<THREE.Group>(null)
   const ringA = useRef<THREE.Mesh>(null)
   const ringB = useRef<THREE.Mesh>(null)
   const beam = useMemo(() => additive(coneTexture(), COLORS.violet, 0.12), [])
+  useEffect(() => () => beam.dispose(), [beam])
   useFrame((state, dt) => {
     if (getMuseum().reducedMotion) return
-    const t = state.clock.elapsedTime
+    const time = state.clock.elapsedTime
     if (group.current) {
       group.current.rotation.y += dt * 0.25
-      group.current.position.y = 2.7 + Math.sin(t * 0.8) * 0.08
+      group.current.position.y = 2.7 + Math.sin(time * 0.8) * 0.08
     }
-    if (ringA.current) ringA.current.rotation.x = t * 0.5
-    if (ringB.current) ringB.current.rotation.z = t * 0.35
+    if (ringA.current) ringA.current.rotation.x = time * 0.5
+    if (ringB.current) ringB.current.rotation.z = time * 0.35
   })
+  const ringMatA = day ? brass(t)! : neon(COLORS.magenta, 2.6)
+  const ringMatB = day ? brass(t)! : neon(COLORS.cyan, 2.4)
   return (
     <group position={[rotunda.cx, 0, rotunda.cz]}>
-      <mesh position={[0, 0.35, 0]} material={MAT.darkMetal()}>
+      <mesh position={[0, 0.35, 0]} material={day ? m.stone : m.frame} castShadow receiveShadow>
         <cylinderGeometry args={[1.3, 1.4, 0.7, 48]} />
       </mesh>
-      <mesh position={[0, 0.71, 0]} rotation-x={Math.PI / 2} material={neon(COLORS.violet, 2.4)}>
+      <mesh position={[0, 0.71, 0]} rotation-x={Math.PI / 2} material={day ? brass(t)! : neon(COLORS.violet, 2.4)}>
         <torusGeometry args={[1.3, 0.015, 8, 64]} />
       </mesh>
       <group ref={group} position={[0, 2.7, 0]}>
-        <mesh material={MAT.darkMetal()}>
-          <icosahedronGeometry args={[0.62, 0]} />
+        <mesh material={day ? standard('#f4f1ea', 0.25, 0.05) : m.frame} castShadow>
+          <icosahedronGeometry args={[0.62, day ? 1 : 0]} />
         </mesh>
-        <mesh scale={1.02}>
-          <icosahedronGeometry args={[0.62, 0]} />
-          <meshBasicMaterial wireframe color={new THREE.Color(COLORS.cyan).multiplyScalar(2.6)} />
+        {!day && (
+          <mesh scale={1.02}>
+            <icosahedronGeometry args={[0.62, 0]} />
+            <meshBasicMaterial wireframe color={new THREE.Color(COLORS.cyan).multiplyScalar(2.6)} />
+          </mesh>
+        )}
+        <mesh ref={ringA} material={ringMatA}>
+          <torusGeometry args={[1.05, day ? 0.022 : 0.012, 12, 96]} />
         </mesh>
-        <mesh ref={ringA} material={neon(COLORS.magenta, 2.6)}>
-          <torusGeometry args={[1.05, 0.012, 8, 96]} />
-        </mesh>
-        <mesh ref={ringB} material={neon(COLORS.cyan, 2.4)}>
-          <torusGeometry args={[1.25, 0.01, 8, 96]} />
+        <mesh ref={ringB} material={ringMatB}>
+          <torusGeometry args={[1.25, day ? 0.018 : 0.01, 12, 96]} />
         </mesh>
       </group>
-      <mesh position={[0, 4.2, 0]} material={beam} raycast={noRaycast}>
-        <cylinderGeometry args={[0.7, 1.2, 7, 32, 1, true]} />
-      </mesh>
+      {!day && (
+        <mesh position={[0, 4.2, 0]} material={beam} raycast={noRaycast}>
+          <cylinderGeometry args={[0.7, 1.2, 7, 32, 1, true]} />
+        </mesh>
+      )}
     </group>
   )
 }
 
 function Directory({ layout }: { layout: MuseumLayout }) {
+  const t = useScene()
+  const m = mats(t)
   const rows = layout.rooms.slice(0, 11)
   const rest = layout.rooms.length - rows.length
   const hit = { kind: 'kiosk' }
   return (
     <group position={[rotunda.cx + rotunda.r - 0.55, 0, rotunda.cz]} rotation-y={-Math.PI / 2}>
-      <mesh position={[0, 2.3, 0]} material={MAT.plaque()} userData={hit}>
+      <mesh position={[0, 2.3, 0]} material={m.plaque} userData={hit}>
         <boxGeometry args={[3.6, 3.0, 0.08]} />
       </mesh>
-      <NeonBar size={[3.66, 0.02, 0.02]} position={[0, 3.81, 0.05]} color={COLORS.cyan} intensity={2.4} />
-      <NeonBar size={[3.66, 0.02, 0.02]} position={[0, 0.79, 0.05]} color={COLORS.cyan} intensity={2.4} />
-      <Label font="mono" fontSize={0.1} color={COLORS.cyan} letterSpacing={0.3} anchorX="left" position={[-1.6, 3.6, 0.05]}>
+      <NeonBar size={[3.66, 0.02, 0.02]} position={[0, 3.81, 0.05]} color={t.primary} intensity={t.name === 'night' ? 2.4 : undefined} />
+      <NeonBar size={[3.66, 0.02, 0.02]} position={[0, 0.79, 0.05]} color={t.primary} intensity={t.name === 'night' ? 2.4 : undefined} />
+      <Label font="mono" fontSize={0.1} color={t.primary} letterSpacing={0.3} anchorX="left" position={[-1.6, 3.6, 0.05]}>
         DIRECTORY
       </Label>
-      <Label font="display" fontSize={0.2} color="#f2f4fb" anchorX="left" position={[-1.6, 3.35, 0.05]}>
+      <Label font="display" fontSize={0.2} anchorX="left" position={[-1.6, 3.35, 0.05]}>
         The Grand Gallery
       </Label>
       {rows.map((r, i) => (
         <group key={r.room.id} position={[-1.6, 3.02 - i * 0.19, 0.05]}>
-          <Label font="mono" fontSize={0.085} color={r.room.accent} anchorX="left">
+          <Label font="mono" fontSize={0.085} color={roomColors(r.room, t.name).accent} anchorX="left">
             {String(i + 1).padStart(2, '0')}
           </Label>
-          <Label fontSize={0.095} color="#d7dcea" anchorX="left" position={[0.3, 0, 0]}>
+          <Label fontSize={0.095} anchorX="left" position={[0.3, 0, 0]}>
             {r.room.title}
           </Label>
-          <Label font="mono" fontSize={0.075} color="#7d859b" anchorX="right" position={[3.2, 0, 0]}>
+          <Label font="mono" fontSize={0.075} color={t.inkMuted} anchorX="right" position={[3.2, 0, 0]}>
             {`${r.side < 0 ? 'LEFT' : 'RIGHT'} · ${r.exhibits.length}`}
           </Label>
         </group>
       ))}
       {rest > 0 && (
-        <Label fontSize={0.085} color="#8b93a8" anchorX="left" position={[-1.6, 3.02 - rows.length * 0.19, 0.05]}>
+        <Label fontSize={0.085} color={t.inkMuted} anchorX="left" position={[-1.6, 3.02 - rows.length * 0.19, 0.05]}>
           {`…and ${rest} more rooms`}
         </Label>
       )}
-      <Label font="mono" fontSize={0.075} color="#8b93a8" letterSpacing={0.12} position={[0, 0.62, 0.05]}>
+      <Label font="mono" fontSize={0.075} color={t.inkMuted} letterSpacing={0.12} position={[0, 0.62, 0.05]}>
         SELECT TO OPEN THE MAP
       </Label>
     </group>
@@ -232,8 +279,11 @@ function Directory({ layout }: { layout: MuseumLayout }) {
 
 function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
   const projects = useMuseum((s) => s.projects)
-  const wallMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLORS.wall, roughness: 0.9, side: THREE.BackSide }), [])
-  const domeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLORS.ceiling, roughness: 0.95, side: THREE.BackSide }), [])
+  const t = useScene()
+  const day = t.name === 'day'
+  const wallMat = useMemo(() => new THREE.MeshStandardMaterial({ color: t.wall, roughness: 0.92, side: THREE.BackSide }), [t.wall])
+  const domeMat = useMemo(() => new THREE.MeshStandardMaterial({ color: t.ceiling, roughness: 0.95, side: THREE.BackSide }), [t.ceiling])
+  useEffect(() => () => [wallMat, domeMat].forEach((x) => x.dispose()), [wallMat, domeMat])
   const southHalf = Math.asin(hall.halfW / rotunda.r)
   const northHalf = Math.asin(gallery.halfW / rotunda.r)
   const R = rotunda.r
@@ -247,6 +297,8 @@ function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
   ]
   const featuredProject = layout.featured ? projects[layout.featured.slug] : null
   const featuredRoom = layout.featured ? layout.rooms.find((r) => r.exhibits.some((e) => e.slug === layout.featured!.slug)) : null
+  const featuredColors = featuredRoom ? roomColors(featuredRoom.room, t.name) : { accent: t.primary, secondary: t.tertiary }
+  const ringMat = day ? brass(t)! : null
 
   return (
     <group>
@@ -258,17 +310,18 @@ function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
       <mesh position={[rotunda.cx, H, rotunda.cz]} scale={[1, 0.42, 1]} material={domeMat}>
         <sphereGeometry args={[R, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
       </mesh>
-      <mesh position={[rotunda.cx, H - 0.03, rotunda.cz]} rotation-x={Math.PI / 2} material={neon(COLORS.magenta, 2.2)}>
-        <torusGeometry args={[R - 0.06, 0.03, 8, 128]} />
+      <mesh position={[rotunda.cx, H - 0.03, rotunda.cz]} rotation-x={Math.PI / 2} material={day ? lineMat(t, t.ink) : neon(COLORS.magenta, 2.2)}>
+        <torusGeometry args={[R - 0.06, day ? 0.02 : 0.03, 8, 128]} />
       </mesh>
-      <mesh position={[rotunda.cx, H + R * 0.42 - 0.15, rotunda.cz]} rotation-x={Math.PI / 2} material={neon(COLORS.cyan, 3)}>
-        <torusGeometry args={[1.6, 0.05, 10, 64]} />
+      {/* Oculus: daylight pours in by day, a neon halo at night */}
+      <mesh position={[rotunda.cx, H + R * 0.42 - 0.15, rotunda.cz]} rotation-x={Math.PI / 2} material={day ? lightMat(t, '#ffffff') : neon(COLORS.cyan, 3)}>
+        {day ? <circleGeometry args={[1.7, 64]} /> : <torusGeometry args={[1.6, 0.05, 10, 64]} />}
       </mesh>
       {[
         [3.0, 3.05, COLORS.cyan],
         [8.9, 8.95, COLORS.violet],
       ].map(([a, b, c]) => (
-        <mesh key={c as string} position={[rotunda.cx, 0.006, rotunda.cz]} rotation-x={-Math.PI / 2} material={neon(c as string, 2)}>
+        <mesh key={c as string} position={[rotunda.cx, 0.006, rotunda.cz]} rotation-x={-Math.PI / 2} material={ringMat ?? neon(c as string, 2)}>
           <ringGeometry args={[a as number, b as number, 128]} />
         </mesh>
       ))}
@@ -283,17 +336,17 @@ function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
           <Exhibit
             ex={layout.featured}
             project={featuredProject}
-            accent={featuredRoom?.room.accent ?? COLORS.cyan}
-            secondary={featuredRoom?.room.secondary ?? COLORS.violet}
+            accent={featuredColors.accent}
+            secondary={featuredColors.secondary}
             ceilingY={6.4}
             world
             caption="Featured"
           />
           <group position={[rotunda.cx - R + 0.55, 0, rotunda.cz]} rotation-y={Math.PI / 2}>
-            <Label font="mono" fontSize={0.12} color="#8b93a8" letterSpacing={0.35} position={[0, 4.55, 0]}>
+            <Label font="mono" fontSize={0.12} color={t.inkMuted} letterSpacing={0.35} position={[0, 4.55, 0]}>
               FEATURED WORK
             </Label>
-            <NeonText color={COLORS.amber} fontSize={0.3} position={[0, 4.15, 0]}>
+            <NeonText color={day ? t.ink : COLORS.amber} fontSize={0.3} position={[0, 4.15, 0]}>
               {featuredProject.title}
             </NeonText>
           </group>
@@ -303,15 +356,15 @@ function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
 
       {/* Signs over the openings */}
       <group position={[0, 0, rotunda.cz - R + 0.3]}>
-        <NeonText color={COLORS.cyan} fontSize={0.42} position={[0, 7.05, 0]} letterSpacing={0.06}>
+        <NeonText color={t.primary} fontSize={0.42} position={[0, 7.05, 0]} letterSpacing={0.06}>
           THE GRAND GALLERY
         </NeonText>
-        <Label font="mono" fontSize={0.14} color="#c9cfe0" letterSpacing={0.25} position={[0, 6.5, 0]}>
+        <Label font="mono" fontSize={0.14} color={t.inkMuted} letterSpacing={0.25} position={[0, 6.5, 0]}>
           {`${layout.rooms.length} ROOMS  ·  ${works} WORKS`}
         </Label>
       </group>
       <group position={[0, 0, rotunda.cz + R - 0.3]} rotation-y={Math.PI}>
-        <Label font="mono" fontSize={0.16} color="#8b93a8" letterSpacing={0.3} position={[0, 5.8, 0]}>
+        <Label font="mono" fontSize={0.16} color={t.inkMuted} letterSpacing={0.3} position={[0, 5.8, 0]}>
           COURTYARD  ·  EXIT
         </Label>
       </group>
@@ -321,27 +374,30 @@ function Rotunda({ layout, works }: { layout: MuseumLayout; works: number }) {
 
 // ── Grand Gallery ─────────────────────────────────────────────────────────
 function Doorway({ layout, index }: { layout: MuseumLayout; index: number }) {
+  const t = useScene()
+  const day = t.name === 'day'
   const r = layout.rooms[index]
-  const accent = r.room.accent
+  const accent = roomColors(r.room, t.name).accent
   const x = r.side * (gallery.halfW - 0.16)
   const hit = { kind: 'door', room: index }
   const doorMat = useMemo(() => new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }), [])
+  useEffect(() => () => doorMat.dispose(), [doorMat])
   return (
     <group position={[x, 0, r.doorZ]} rotation-y={r.side < 0 ? Math.PI / 2 : -Math.PI / 2}>
       {[-1, 1].map((s) => (
-        <NeonBar key={s} size={[0.05, room.doorH, 0.05]} position={[s * (room.doorHalf + 0.03), room.doorH / 2, 0]} color={accent} intensity={3} />
+        <NeonBar key={s} size={[0.05, room.doorH, 0.05]} position={[s * (room.doorHalf + 0.03), room.doorH / 2, 0]} color={accent} intensity={day ? undefined : 3} />
       ))}
-      <NeonBar size={[room.doorHalf * 2 + 0.11, 0.05, 0.05]} position={[0, room.doorH + 0.02, 0]} color={accent} intensity={3} />
+      <NeonBar size={[room.doorHalf * 2 + 0.11, 0.05, 0.05]} position={[0, room.doorH + 0.02, 0]} color={accent} intensity={day ? undefined : 3} />
       <mesh position={[0, room.doorH / 2, 0.02]} material={doorMat} userData={hit}>
         <planeGeometry args={[room.doorHalf * 2, room.doorH]} />
       </mesh>
-      <Label font="mono" fontSize={0.1} color="#8b93a8" letterSpacing={0.3} position={[0, 4.85, 0]}>
+      <Label font="mono" fontSize={0.1} color={t.inkMuted} letterSpacing={0.3} position={[0, 4.85, 0]}>
         {`ROOM ${String(index + 1).padStart(2, '0')}`}
       </Label>
       <NeonText color={accent} fontSize={0.27} position={[0, 4.48, 0]} maxWidth={4.4} textAlign="center">
         {r.room.title}
       </NeonText>
-      <Label font="mono" fontSize={0.09} color="#c9cfe0" letterSpacing={0.2} position={[0, 4.12, 0]}>
+      <Label font="mono" fontSize={0.09} color={t.inkMuted} letterSpacing={0.2} position={[0, 4.12, 0]}>
         {`${r.exhibits.length} ${r.exhibits.length === 1 ? 'WORK' : 'WORKS'}`}
       </Label>
     </group>
@@ -349,6 +405,9 @@ function Doorway({ layout, index }: { layout: MuseumLayout; index: number }) {
 }
 
 function GrandGallery({ layout }: { layout: MuseumLayout }) {
+  const t = useScene()
+  const m = mats(t)
+  const day = t.name === 'day'
   const end = layout.galleryEndZ
   const length = gallery.z0 - end
   const midZ = (gallery.z0 + end) / 2
@@ -365,47 +424,49 @@ function GrandGallery({ layout }: { layout: MuseumLayout }) {
   return (
     <group>
       {pieces.map((p, i) => (
-        <Block key={i} size={[0.3, gallery.h, p.z1 - p.z0]} position={[p.side * (gallery.halfW + 0.15), gallery.h / 2, (p.z0 + p.z1) / 2]} material={MAT.wall()} />
+        <Block key={i} size={[0.3, gallery.h, p.z1 - p.z0]} position={[p.side * (gallery.halfW + 0.15), gallery.h / 2, (p.z0 + p.z1) / 2]} material={m.wall} />
       ))}
       {layout.rooms.map((r) => (
         <Block
           key={r.index}
           size={[0.3, gallery.h - room.doorH, room.doorHalf * 2]}
           position={[r.side * (gallery.halfW + 0.15), room.doorH + (gallery.h - room.doorH) / 2, r.doorZ]}
-          material={MAT.wall()}
+          material={m.wall}
         />
       ))}
-      <mesh position={[0, gallery.h, midZ]} rotation-x={Math.PI / 2} material={MAT.ceiling()}>
+      <mesh position={[0, gallery.h, midZ]} rotation-x={Math.PI / 2} material={m.ceiling}>
         <planeGeometry args={[gallery.halfW * 2, length]} />
       </mesh>
-      {[-1.3, 1.3].map((x) => (
-        <NeonBar key={x} size={[0.08, 0.02, length - 0.4]} position={[x, gallery.h - 0.02, midZ]} color="#cdd6ff" intensity={1.5} />
-      ))}
+      {day ? (
+        <NeonBar kind="light" size={[1.4, 0.02, length - 0.8]} position={[0, gallery.h - 0.02, midZ]} color="#ffffff" />
+      ) : (
+        [-1.3, 1.3].map((x) => <NeonBar key={x} kind="light" size={[0.08, 0.02, length - 0.4]} position={[x, gallery.h - 0.02, midZ]} color="#cdd6ff" />)
+      )}
       {[-1, 1].map((s) => (
-        <NeonBar key={s} size={[0.02, 0.035, length]} position={[s * (gallery.halfW - 0.01), 0.03, midZ]} color={COLORS.violet} intensity={1.8} />
+        <NeonBar key={s} size={[0.02, 0.035, length]} position={[s * (gallery.halfW - 0.01), 0.03, midZ]} color={t.tertiary} intensity={day ? undefined : 1.8} />
       ))}
       {layout.rooms.map((r) => (
         <Doorway key={r.room.id} layout={layout} index={r.index} />
       ))}
 
       {/* End wall */}
-      <Block size={[gallery.halfW * 2 + 0.6, gallery.h, 0.3]} position={[0, gallery.h / 2, end - 0.15]} material={MAT.wallLight()} />
+      <Block size={[gallery.halfW * 2 + 0.6, gallery.h, 0.3]} position={[0, gallery.h / 2, end - 0.15]} material={m.wallAlt} />
       <group position={[0, 0, end + 0.02]}>
-        <Label font="mono" fontSize={0.12} color="#8b93a8" letterSpacing={0.35} position={[0, 3.95, 0]}>
+        <Label font="mono" fontSize={0.12} color={t.inkMuted} letterSpacing={0.35} position={[0, 3.95, 0]}>
           END OF THE GALLERY
         </Label>
-        <NeonText color={COLORS.magenta} fontSize={0.48} position={[0, 3.35, 0]}>
+        <NeonText color={t.secondary} fontSize={0.48} position={[0, 3.35, 0]}>
           Thank you for visiting
         </NeonText>
-        <Label fontSize={0.16} color="#c9cfe0" position={[0, 2.8, 0]}>
+        <Label fontSize={0.16} position={[0, 2.8, 0]}>
           {`${site.name} — ${site.role}`}
         </Label>
         {hasContact && (
-          <Label font="mono" fontSize={0.11} color={COLORS.cyan} letterSpacing={0.1} position={[0, 2.4, 0]}>
+          <Label font="mono" fontSize={0.11} color={t.primary} letterSpacing={0.1} position={[0, 2.4, 0]}>
             {[site.contact.email, site.contact.github, site.contact.linkedin].filter(Boolean).join('   ·   ')}
           </Label>
         )}
-        <NeonBar size={[4.6, 0.02, 0.02]} position={[0, 2.05, 0]} color={COLORS.violet} intensity={2} />
+        <NeonBar size={[4.6, 0.02, 0.02]} position={[0, 2.05, 0]} color={t.tertiary} intensity={day ? undefined : 2} />
       </group>
     </group>
   )
@@ -421,4 +482,3 @@ export function Interior({ layout }: { layout: MuseumLayout }) {
     </group>
   )
 }
-

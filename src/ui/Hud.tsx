@@ -2,11 +2,11 @@
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
 import { useEffect } from 'react'
-import { CircleHelp, Footprints, Gauge, LayoutGrid, Map as MapIcon, MousePointer2, Route, Search, Volume2, VolumeX } from 'lucide-react'
+import { CircleHelp, Footprints, Gauge, LayoutGrid, Moon, Sun, Map as MapIcon, MousePointer2, Route, Search, Volume2, VolumeX } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { site } from '@/site.config'
 import { getMuseum, useMuseum } from '@/museum/store'
-import { goToEntrance, setMode, showHint, startTour, stopTour, toggleMute } from '@/museum/actions'
+import { goToEntrance, setMode, setTheme, showHint, startTour, stopTour, toggleMute } from '@/museum/actions'
 import { MiniMap } from './FloorPlan'
 
 export function IconButton({
@@ -28,7 +28,7 @@ export function IconButton({
   secondary?: boolean
 }) {
   const cls = `group relative ${secondary ? 'hidden sm:grid' : 'grid'} size-10 place-items-center rounded-full border transition ${
-    active ? 'border-cyan/70 bg-cyan/15 text-cyan' : 'border-white/10 bg-panel/70 text-ink hover:border-white/25 hover:bg-panel-2'
+    active ? 'border-primary/70 bg-primary/15 text-primary' : 'border-ink/10 bg-panel/70 text-ink hover:border-ink/25 hover:bg-panel-2'
   } backdrop-blur-md`
   const tip = (
     <span className="pointer-events-none absolute top-full right-0 mt-2 hidden whitespace-nowrap rounded-md bg-panel-2 px-2 py-1 text-[11px] text-ink shadow-lg group-hover:block group-focus-visible:block">
@@ -68,6 +68,7 @@ export function Hud() {
   const locked = useMuseum((s) => s.pointerLocked)
   const touch = useMuseum((s) => s.touch)
   const focused = useMuseum((s) => s.focused)
+  const theme = useMuseum((s) => s.theme)
 
   // First-visit hint, once per page load.
   useEffect(() => {
@@ -109,7 +110,7 @@ export function Hud() {
           <button
             type="button"
             onClick={goToEntrance}
-            className="grid size-10 place-items-center rounded-full border border-magenta/50 bg-panel/70 font-display text-sm font-bold text-magenta backdrop-blur-md transition hover:shadow-[0_0_24px_rgba(255,61,166,0.5)]"
+            className="grid size-10 place-items-center rounded-full border border-secondary/50 bg-panel/70 font-display text-sm font-bold text-secondary backdrop-blur-md transition hover:shadow-[0_0_24px_rgb(var(--secondary-rgb)/0.5)]"
             aria-label="Return to the courtyard entrance"
             title="Return to entrance"
           >
@@ -156,6 +157,9 @@ export function Hud() {
         <IconButton label={muted ? 'Unmute ambience' : 'Mute ambience'} shortcut="N" onClick={toggleMute} active={!muted}>
           {muted ? <VolumeX size={17} /> : <Volume2 size={17} />}
         </IconButton>
+        <IconButton label={theme === 'day' ? 'Night mode' : 'Daylight'} shortcut="L" onClick={() => void setTheme(theme === 'day' ? 'night' : 'day')}>
+          {theme === 'day' ? <Moon size={17} /> : <Sun size={17} />}
+        </IconButton>
         <IconButton secondary label={`Quality: ${quality === 'auto' ? `auto (${tier})` : quality}`} onClick={cycleQuality}>
           <Gauge size={17} />
         </IconButton>
@@ -176,7 +180,7 @@ export function Hud() {
 
       {/* Crosshair in pointer-lock walk mode */}
       {locked && !focused && (
-        <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 size-1.5 -translate-1/2 rounded-full bg-white/80 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+        <div className="pointer-events-none absolute top-1/2 left-1/2 z-10 size-1.5 -translate-1/2 rounded-full bg-ink/80 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
       )}
 
       {/* Hints */}

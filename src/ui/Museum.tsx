@@ -9,7 +9,8 @@ import { buildTour } from '@/museum/layout/tour'
 import { getMuseum, useMuseum } from '@/museum/store'
 import { setPose } from '@/museum/player'
 import { audio } from '@/museum/audio'
-import { closeFocus, focusExhibit, goToEntrance, goToRoom, startTour, stopTour, toggleMute } from '@/museum/actions'
+import { applyThemeAttr, closeFocus, focusExhibit, goToEntrance, goToRoom, setTheme, startTour, stopTour, toggleMute } from '@/museum/actions'
+import type { ThemeName } from '@/museum/theme'
 import { Welcome } from './Welcome'
 import { Hud } from './Hud'
 import { ExhibitPanel } from './ExhibitPanel'
@@ -64,9 +65,11 @@ export function Museum({ projects, rooms, initial }: { projects: Project[]; room
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     const weak = (navigator.hardwareConcurrency ?? 8) <= 4
     let muted = false
+    let theme: ThemeName = 'day'
     let qualitySetting: 'auto' | 'low' | 'medium' | 'high' = 'auto'
     try {
       muted = localStorage.getItem('museum:muted') === '1'
+      theme = localStorage.getItem('museum:theme') === 'night' ? 'night' : 'day'
       qualitySetting = (localStorage.getItem('museum:quality') as typeof qualitySetting) || 'auto'
     } catch {}
     const tier = qualitySetting !== 'auto' ? qualitySetting : touch || weak ? 'medium' : 'high'
@@ -86,10 +89,13 @@ export function Museum({ projects, rooms, initial }: { projects: Project[]; room
       tier,
       qualitySetting,
       muted,
+      theme,
       mode: 'glide',
       location: locate(layout, pose.x, pose.z),
       nearRooms: nearRoomsFor(layout, pose.x, pose.z),
     })
+    applyThemeAttr(theme)
+    audio.setTheme(theme)
     setWebgl(hasWebGL())
   }, [projects, rooms, initial])
 
@@ -153,6 +159,7 @@ export function Museum({ projects, rooms, initial }: { projects: Project[]; room
       } else if (k === '?' || k === 'h') s.set({ overlay: s.overlay === 'help' ? null : 'help' })
       else if (k === 't') (s.tour.active ? stopTour() : void startTour())
       else if (k === 'n' && !s.focused) toggleMute()
+      else if (k === 'l') void setTheme(s.theme === 'day' ? 'night' : 'day')
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -169,7 +176,7 @@ export function Museum({ projects, rooms, initial }: { projects: Project[]; room
   }
 
   return (
-    <main className="fixed inset-0 overflow-hidden bg-void select-none" aria-label="The Neon Archive, a walk-through portfolio museum">
+    <main className="fixed inset-0 overflow-hidden bg-void select-none" aria-label="The Archive, a walk-through portfolio museum">
       <h1 className="sr-only">Portfolio museum</h1>
       {webgl && layoutReady && <MuseumCanvas />}
       {webgl === false && (
@@ -177,7 +184,7 @@ export function Museum({ projects, rooms, initial }: { projects: Project[]; room
           <div className="glass max-w-md rounded-2xl p-8">
             <h2 className="font-display text-2xl font-semibold">The 3D museum needs WebGL</h2>
             <p className="mt-3 text-sm text-muted">This browser or device can&apos;t render the gallery. Every work is also on display in the 2D archive.</p>
-            <Link href="/projects" className="mt-6 inline-flex rounded-full bg-cyan px-5 py-2.5 text-sm font-semibold text-void">
+            <Link href="/projects" className="mt-6 inline-flex rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-(--on-primary)">
               Browse the collection
             </Link>
           </div>

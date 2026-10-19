@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import { getMuseumData } from '@/lib/content'
 import { site } from '@/site.config'
 import { PosterArt } from '@/ui/PosterArt'
+import { roomCssVars } from '@/museum/theme'
 
 export const dynamicParams = false
 type Params = { params: Promise<{ slug: string }> }
@@ -37,23 +38,23 @@ export default async function ProjectPage({ params }: Params) {
   if (!hit) notFound()
   const { project: p, room, number } = hit
   return (
-    <main className="mx-auto max-w-4xl px-4 pt-8 pb-24 sm:px-8">
+    <main className="room-vars mx-auto max-w-4xl px-4 pt-8 pb-24 sm:px-8" style={roomCssVars(room)}>
       <nav className="flex items-center justify-between text-sm text-muted">
         <Link href="/projects" className="hover:text-ink">← The collection</Link>
-        <Link href={`/museum/${room.id}/${p.slug}`} className="rounded-full border border-line px-4 py-2 text-ink hover:border-white/30">
+        <Link href={`/museum/${room.id}/${p.slug}`} className="rounded-full border border-line px-4 py-2 text-ink hover:border-ink/30">
           See it in the museum
         </Link>
       </nav>
-      <p className="mt-10 font-mono text-[11px] tracking-[0.3em]" style={{ color: room.accent }}>
+      <p className="mt-10 font-mono text-[11px] tracking-[0.3em]" style={{ color: 'var(--room)' }}>
         {number} / {room.title.toUpperCase()}
       </p>
       <h1 className="mt-2 font-display text-4xl font-bold sm:text-5xl">{p.title}</h1>
       {p.tagline && <p className="mt-3 text-lg text-ink/80">{p.tagline}</p>}
-      <div className="mt-8 overflow-hidden rounded-3xl border border-line" style={{ boxShadow: `0 0 80px -30px ${room.accent}` }}>
+      <div className="mt-8 overflow-hidden rounded-3xl border border-line" style={{ boxShadow: '0 30px 80px -40px var(--room)' }}>
         {p.media.loop ? (
           <video src={p.media.loop} poster={p.media.poster} className="aspect-[16/10] w-full object-cover object-top" autoPlay muted loop playsInline />
         ) : (
-          <PosterArt project={p} accent={room.accent} secondary={room.secondary} number={number} />
+          <PosterArt project={p} number={number} vars={roomCssVars(room)} />
         )}
       </div>
       <div className="mt-8 grid gap-10 md:grid-cols-[1fr_15rem]">
@@ -83,12 +84,12 @@ export default async function ProjectPage({ params }: Params) {
           )}
           <div className="flex flex-col gap-2">
             {p.links.live && (
-              <a href={p.links.live} target="_blank" rel="noreferrer" className="rounded-full px-4 py-2.5 text-center font-semibold text-void" style={{ background: room.accent }}>
+              <a href={p.links.live} target="_blank" rel="noreferrer" className="rounded-full bg-primary px-4 py-2.5 text-center font-semibold text-(--on-primary)">
                 Visit live site ↗
               </a>
             )}
             {p.links.repo && (
-              <a href={p.links.repo} target="_blank" rel="noreferrer" className="rounded-full border border-line px-4 py-2.5 text-center hover:border-white/30">
+              <a href={p.links.repo} target="_blank" rel="noreferrer" className="rounded-full border border-line px-4 py-2.5 text-center hover:border-ink/30">
                 Source code ↗
               </a>
             )}

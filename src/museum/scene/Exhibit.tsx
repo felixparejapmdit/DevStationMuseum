@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { Project } from '@/lib/types'
 import type { ExhibitLayout } from '../layout/layoutMuseum'
-import { getMuseum, useMuseum } from '../store'
+import { getMuseum, useMuseum, useScene } from '../store'
 import { player } from '../player'
 import { audio } from '../audio'
-import { additive, coneTexture, dimmableNeon, FONTS, glowTexture, MAT, noRaycast } from './materials'
+import { additive, coneTexture, dimmableNeon, FONTS, frameShadowTexture, glowTexture, mats as materialsFor, neon, noRaycast } from './materials'
 import { ensureCanvasFonts, makePosterTexture } from './poster'
 import { Text } from '@react-three/drei'
 
@@ -53,7 +53,7 @@ function useExhibitMedia(project: Project, accent: string, secondary: string, nu
       setTexture(t)
     }
     void ensureCanvasFonts().then(() => {
-      if (!disposed && !project.media.poster) swap(makePosterTexture(project, accent, secondary, number, frameAspect))
+      if (!disposed && !project.media.poster) swap(makePosterTexture(project, accent, secondary, number, frameAspect, getMuseum().theme === 'day'))
     })
     if (project.media.poster) {
       new THREE.TextureLoader().load(
@@ -66,7 +66,7 @@ function useExhibitMedia(project: Project, accent: string, secondary: string, nu
           swap(t)
         },
         undefined,
-        () => void ensureCanvasFonts().then(() => swap(makePosterTexture(project, accent, secondary, number, frameAspect))),
+        () => void ensureCanvasFonts().then(() => swap(makePosterTexture(project, accent, secondary, number, frameAspect, getMuseum().theme === 'day'))),
       )
     }
     return () => {
@@ -105,29 +105,33 @@ function useExhibitMedia(project: Project, accent: string, secondary: string, nu
 }
 
 export function Exhibit({ ex, project, accent, secondary, ceilingY, world = false, caption }: Props) {
+  const t = useScene()
+  const surface = materialsFor(t)
+  const day = t.name === 'day'
   const { w, h } = ex
   const centerY = ex.position[1]
   const [near, setNear] = useState(false)
   const media = useExhibitMedia(project, accent, secondary, ex.number, w, h, near)
 
-  const mats = useMemo(
+  const m = useMemo(
     () => ({
-      screen: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.2, 0.2, 0.2), toneMapped: false }),
+      screen: new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(t.screenBase), toneMapped: false }),
       edge: dimmableNeon(accent),
       wash: additive(glowTexture(), accent, 0),
       cone: additive(coneTexture(), '#fff4e0', 0),
       pool: additive(glowTexture(), '#fff4e0', 0),
-      ring: new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(2), transparent: true, opacity: 0, depthWrite: false }),
+      shadow: new THREE.MeshBasicMaterial({ map: frameShadowTexture(), color: '#000000', transparent: true, opacity: 0.3, depthWrite: false }),
+      ring: new THREE.MeshBasicMaterial({ color: new THREE.Color(accent).multiplyScalar(day ? 1 : 2), transparent: true, opacity: 0, depthWrite: false }),
       lens: dimmableNeon('#fff2d6'),
     }),
-    [accent],
+    [accent, day, t.screenBase],
   )
-  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats])
+  useEffect(() => () => Object.values(m).forEach((x) => x.dispose()), [m])
 
   useEffect(() => {
-    mats.screen.map = media
-    mats.screen.needsUpdate = true
-  }, [media, mats])
+    m.screen.map = media
+    m.screen.needsUpdate = true
+  }, [media, m])
 
   // Spotlight geometry: from a ceiling fixture in front of the frame down onto it.
   const spot = useMemo(() => {
@@ -163,7 +167,7 @@ export function Exhibit({ ex, project, accent, secondary, ceilingY, world = fals
       litOnce.current = false
       litAt.current = null
     } else if (litAt.current === null) {
-      // Stagger switch-on so the lights pop on one after another as you walk in.
+      // Stagger switch-on so the track lights pop on one after another as you walk in.
       litAt.current = state.clock.elapsedTime + ex.order * 0.14
     }
     const rate = target ? 2.4 : 1.2
@@ -171,95 +175,99 @@ export function Exhibit({ ex, project, accent, secondary, ceilingY, world = fals
       on.current += (target - on.current) * Math.min(1, dt * rate)
     }
     const v = on.current
-    mats.screen.color.setScalar(0.16 + 0.84 * v)
-    mats.wash.opacity = 0.42 * v
-    mats.cone.opacity = 0.075 * v
-    mats.pool.opacity = 0.22 * v
-    mats.edge.color.copy(accentColor).multiplyScalar(0.08 + 2.6 * v)
-    mats.lens.color.copy(lensColor).multiplyScalar(0.05 + 4 * v)
+    m.screen.color.setScalar(t.screenBase + (1 - t.screenBase) * v)
+    m.wash.opacity = t.wash * v
+    m.cone.opacity = t.cone * v
+    m.pool.opacity = (day ? 0 : 0.22) * v
+    m.edge.color.copy(accentColor).multiplyScalar(0.08 + 2.6 * v)
+    m.lens.color.copy(lensColor).multiplyScalar(0.05 + 4 * v)
     const focused = s.focused === ex.id
-    mats.ring.opacity = focused || s.tour.active ? 0 : v * (0.35 + 0.25 * Math.sin(state.clock.elapsedTime * 2.4))
+    m.ring.opacity = focused || s.tour.active ? 0 : v * ((day ? 0.55 : 0.35) + 0.25 * Math.sin(state.clock.elapsedTime * 2.4))
     if (ringRef.current) ringRef.current.scale.setScalar(1 + 0.06 * Math.sin(state.clock.elapsedTime * 2.4))
     const isNear = d < 11 && sameSpace
     if (isNear !== near) setNear(isNear)
   })
 
-  const position: [number, number, number] = world
-    ? ex.position
-    : [ex.local!.lx, ex.local!.y, ex.local!.lz]
+  const position: [number, number, number] = world ? ex.position : [ex.local!.lx, ex.local!.y, ex.local!.lz]
   const rotationY = world ? ex.rotationY : ex.local!.rotY
   const hit = { kind: 'exhibit', id: ex.id }
-  const plaqueX = w / 2 + 0.5
+  const matBorder = day ? 0.14 : 0
+  const plaqueX = w / 2 + 0.5 + matBorder
   const plaqueY = 1.38 - centerY
 
   return (
     <group position={position} rotation-y={rotationY} userData={hit}>
-      {/* Wall wash behind the frame */}
-      <mesh position={[0, 0.05, 0.012]} material={mats.wash} raycast={noRaycast}>
-        <planeGeometry args={[w * 2.3, h * 2.6]} />
+      {day ? (
+        /* Soft shadow the hanging frame casts on the wall (skylight from above). */
+        <mesh position={[0.04, -0.08, 0.006]} material={m.shadow} raycast={noRaycast}>
+          <planeGeometry args={[(w + matBorder * 2) * 1.32, (h + matBorder * 2) * 1.38]} />
+        </mesh>
+      ) : (
+        <mesh position={[0, 0.05, 0.012]} material={m.wash} raycast={noRaycast}>
+          <planeGeometry args={[w * 2.3, h * 2.6]} />
+        </mesh>
+      )}
+      {/* Frame (thin profile), mat (passe-partout by day), screen */}
+      <mesh position={[0, 0, 0.04]} material={surface.frame} userData={hit}>
+        <boxGeometry args={[w + matBorder * 2 + (day ? 0.06 : 0.16), h + matBorder * 2 + (day ? 0.06 : 0.16), 0.08]} />
       </mesh>
-      {/* Frame */}
-      <mesh position={[0, 0, 0.04]} material={MAT.darkMetal()} userData={hit}>
-        <boxGeometry args={[w + 0.16, h + 0.16, 0.08]} />
-      </mesh>
-      {/* Screen */}
-      <mesh position={[0, 0, 0.082]} material={mats.screen} userData={hit}>
+      {day && (
+        <mesh position={[0, 0, 0.081]} material={surface.mat} userData={hit}>
+          <planeGeometry args={[w + matBorder * 2, h + matBorder * 2]} />
+        </mesh>
+      )}
+      <mesh position={[0, 0, 0.083]} material={m.screen} userData={hit}>
         <planeGeometry args={[w, h]} />
       </mesh>
-      {/* Neon edge */}
-      {[
-        [0, h / 2 + 0.06, w + 0.12, 0.02],
-        [0, -h / 2 - 0.06, w + 0.12, 0.02],
-        [w / 2 + 0.06, 0, 0.02, h + 0.12],
-        [-w / 2 - 0.06, 0, 0.02, h + 0.12],
-      ].map(([x, y, sx, sy], i) => (
-        <mesh key={i} position={[x, y, 0.086]} material={mats.edge} raycast={noRaycast}>
-          <boxGeometry args={[sx, sy, 0.012]} />
-        </mesh>
-      ))}
+      {!day &&
+        [
+          [0, h / 2 + 0.06, w + 0.12, 0.02],
+          [0, -h / 2 - 0.06, w + 0.12, 0.02],
+          [w / 2 + 0.06, 0, 0.02, h + 0.12],
+          [-w / 2 - 0.06, 0, 0.02, h + 0.12],
+        ].map(([x, y, sx, sy], i) => (
+          <mesh key={i} position={[x, y, 0.086]} material={m.edge} raycast={noRaycast}>
+            <boxGeometry args={[sx, sy, 0.012]} />
+          </mesh>
+        ))}
 
-      {/* Track-light fixture + beam */}
+      {/* Track-light fixture (+ visible beam at night) */}
       <group position={spot.fixture.toArray()}>
-        <mesh material={MAT.darkMetal()} rotation-x={0.6}>
+        <mesh material={surface.frame} rotation-x={0.6}>
           <cylinderGeometry args={[0.07, 0.09, 0.26, 14]} />
         </mesh>
-        <mesh position={[0, -0.12, 0.08]} rotation-x={0.6 + Math.PI / 2} material={mats.lens} raycast={noRaycast}>
+        <mesh position={[0, -0.12, 0.08]} rotation-x={0.6 + Math.PI / 2} material={m.lens} raycast={noRaycast}>
           <circleGeometry args={[0.07, 16]} />
         </mesh>
-        <mesh geometry={spot.geo} quaternion={spot.quat} material={mats.cone} raycast={noRaycast} renderOrder={2} />
+        {!day && <mesh geometry={spot.geo} quaternion={spot.quat} material={m.cone} raycast={noRaycast} renderOrder={2} />}
       </group>
-      {/* Light pool on the floor */}
-      <mesh position={[0, -centerY + 0.012, 0.9]} rotation-x={-Math.PI / 2} material={mats.pool} raycast={noRaycast}>
-        <planeGeometry args={[w * 1.3, 1.6]} />
-      </mesh>
+      {!day && (
+        <mesh position={[0, -centerY + 0.012, 0.9]} rotation-x={-Math.PI / 2} material={m.pool} raycast={noRaycast}>
+          <planeGeometry args={[w * 1.3, 1.6]} />
+        </mesh>
+      )}
 
       {/* Plaque */}
       <group position={[plaqueX, plaqueY, 0.02]}>
-        <mesh material={MAT.plaque()} userData={hit}>
+        <mesh material={surface.plaque} userData={hit}>
           <boxGeometry args={[0.66, 0.44, 0.025]} />
         </mesh>
-        <mesh position={[-0.33 + 0.012, 0, 0.014]} material={mats.edge} raycast={noRaycast}>
+        <mesh position={[-0.33 + 0.012, 0, 0.014]} material={day ? neon(accent, 1) : m.edge} raycast={noRaycast}>
           <boxGeometry args={[0.008, 0.38, 0.004]} />
         </mesh>
         <Text font={FONTS.mono} fontSize={0.026} color={accent} anchorX="left" anchorY="top" position={[-0.28, 0.185, 0.015]} letterSpacing={0.08}>
           {`${ex.number}  /  ${caption.toUpperCase()}`}
         </Text>
-        <Text font={FONTS.display} fontSize={0.056} color="#f1f3fa" anchorX="left" anchorY="top" position={[-0.28, 0.14, 0.015]} maxWidth={0.56} lineHeight={1.05}>
+        <Text font={FONTS.display} fontSize={0.056} color={t.ink} anchorX="left" anchorY="top" position={[-0.28, 0.14, 0.015]} maxWidth={0.56} lineHeight={1.05}>
           {project.title}
         </Text>
-        <Text font={FONTS.body} fontSize={0.024} color="#9aa3b8" anchorX="left" anchorY="bottom" position={[-0.28, -0.18, 0.015]} maxWidth={0.56} lineHeight={1.35}>
+        <Text font={FONTS.body} fontSize={0.024} color={t.inkMuted} anchorX="left" anchorY="bottom" position={[-0.28, -0.18, 0.015]} maxWidth={0.56} lineHeight={1.35}>
           {`${project.year}${project.tech.length ? ' · ' + project.tech.slice(0, 4).join(', ') : ''}`}
         </Text>
       </group>
 
       {/* Floor marker: click to step up to the work */}
-      <mesh
-        ref={ringRef}
-        position={[0, -centerY + 0.02, 2.1]}
-        rotation-x={-Math.PI / 2}
-        material={mats.ring}
-        userData={hit}
-      >
+      <mesh ref={ringRef} position={[0, -centerY + 0.02, 2.1]} rotation-x={-Math.PI / 2} material={m.ring} userData={hit}>
         <ringGeometry args={[0.3, 0.38, 40]} />
       </mesh>
     </group>

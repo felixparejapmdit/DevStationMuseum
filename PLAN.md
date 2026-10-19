@@ -15,7 +15,7 @@ Decisions taken while building, where they differ from or sharpen the plan below
 | --- | --- | --- | --- |
 | Collision | Rapier | Small 2D segment/circle solver generated from layout data ([collision.ts](src/museum/layout/collision.ts)) | Same "colliders from data" goal without ~2 MB of WASM; deterministic and unit-tested |
 | Site structure | Museum at `/museum` | Museum **is** the site: `/` is the courtyard, deep links at `/museum/<room>/<project>`, 2D at `/projects` | Answer to open question 4 |
-| Visual direction | — | Dark neon gallery (Space Grotesk, Inter, JetBrains Mono; cyan / magenta / violet / lime / amber) | Answer to open question 3 |
+| Visual direction | — | **Daylit contemporary gallery** by default (warm white walls, oak + terrazzo floors, skylights, one muted feature-wall colour per room, cobalt UI accent) with the original **dark neon** kept as a night-mode toggle (`L`) | v1 shipped dark neon (open question 3); switched on 2026-10-19 because most exhibits are business software with light UIs that read better as framed prints in daylight |
 | Media | Video loops | Generated neon artwork per project until captured; `npm run capture` + [CAPTURE.md](CAPTURE.md) | Answer to open question 2: capture session planned |
 | Content | `src/content` MDX | `content/projects/*.md` (frontmatter + Markdown), Zod-validated | Simpler editing; 33 projects seeded from D:\PROJECTS |
 | UI kit | shadcn/ui | Tailwind 4 components + `cmdk` + Motion | Only a handful of components were needed |
@@ -419,6 +419,6 @@ There are two pure functions:
 ## Open questions (answered, see Implementation notes)
 1. ~~Room-per-category or room-per-project?~~ **Decided**: rooms are generated from the projects, at most 5 per room, grouped by category (§2.2). Both counts are flexible.
 2. **List of projects + media**: do I have screen recordings for video loops, or should I plan a capture session? plan a capture session
-3. **Visual direction**: warm minimal gallery (like the reference), dark neon gallery, or a mix per room? dark neon gallery
+3. **Visual direction**: warm minimal gallery (like the reference), dark neon gallery, or a mix per room? dark neon gallery → later changed to daylit gallery + night-mode toggle
 4. **Is this the whole site** (museum at `/`) or a section of an existing portfolio (museum at `/museum`)? yes
 5. **Brand assets**: name/logo for the façade sign, fonts, colour palette. please decide make it the best

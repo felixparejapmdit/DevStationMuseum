@@ -4,6 +4,7 @@ import { currentPose, player, setPose, stopMotion, tweenTo } from './player'
 import { audio } from './audio'
 import { hasLineOfSight } from './layout/collision'
 import { locate, nearRoomsFor, type ExhibitLayout, type Pose } from './layout/layoutMuseum'
+import type { ThemeName } from './theme'
 import { track } from '@vercel/analytics'
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -148,6 +149,37 @@ export function setMode(mode: 'glide' | 'walk') {
   const s = getMuseum()
   s.set({ mode })
   if (mode === 'glide' && document.pointerLockElement) document.exitPointerLock()
+}
+
+/** Applies the theme to the HTML overlay (CSS variables) and remembers it. */
+export function applyThemeAttr(theme: ThemeName) {
+  document.documentElement.dataset.theme = theme
+  try {
+    localStorage.setItem('museum:theme', theme)
+  } catch {}
+}
+
+/** Daylit gallery ↔ neon night. The doors close while the scene rebuilds. */
+export async function setTheme(theme: ThemeName) {
+  const s = getMuseum()
+  if (s.theme === theme || transitioning) return
+  applyThemeAttr(theme)
+  audio.setTheme(theme)
+  if (!s.started) {
+    s.set({ theme })
+    return
+  }
+  transitioning = true
+  audio.whoosh()
+  s.set({ transition: 'closing', transitionLabel: theme === 'day' ? 'Daylight' : 'Night mode' })
+  await wait(s.reducedMotion ? 60 : 380)
+  getMuseum().set({ theme })
+  await wait(450) // give the rebuilt scene a moment before revealing it
+  getMuseum().set({ transition: 'opening' })
+  await wait(s.reducedMotion ? 60 : 460)
+  getMuseum().set({ transition: 'idle', transitionLabel: '' })
+  transitioning = false
+  track('theme', { theme })
 }
 
 export function toggleMute() {

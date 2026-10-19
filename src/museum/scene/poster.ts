@@ -47,7 +47,10 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, max
  * Placeholder artwork for projects whose screen capture hasn't been recorded yet.
  * Deterministic per project, in the room's colours, so a fresh museum still looks curated.
  */
-export function makePosterTexture(project: Project, accent: string, secondary: string, number: string, aspect: number) {
+export function makePosterTexture(project: Project, accent: string, secondary: string, number: string, aspect: number, day = false) {
+  // Day posters read like printed gallery pieces: paper ground, ink type, painted tints.
+  const ink = day ? '#1d1f24' : '#f2f4fb'
+  const sub = day ? '#5d616b' : '#aab2c8'
   const W = 1280
   const H = Math.round(W / aspect)
   const c = document.createElement('canvas')
@@ -60,8 +63,8 @@ export function makePosterTexture(project: Project, accent: string, secondary: s
   const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
 
   const bg = ctx.createLinearGradient(0, 0, W, H)
-  bg.addColorStop(0, '#06070d')
-  bg.addColorStop(1, '#0d0f1a')
+  bg.addColorStop(0, day ? '#fbf9f4' : '#06070d')
+  bg.addColorStop(1, day ? '#efebe2' : '#0d0f1a')
   ctx.fillStyle = bg
   ctx.fillRect(0, 0, W, H)
 
@@ -99,7 +102,7 @@ export function makePosterTexture(project: Project, accent: string, secondary: s
   const wy = H * 0.14
   const ww = W * 0.36
   const wh = H * 0.42
-  ctx.fillStyle = '#0b0d16ee'
+  ctx.fillStyle = day ? '#ffffffee' : '#0b0d16ee'
   ctx.strokeStyle = accent + 'aa'
   ctx.lineWidth = 3
   ctx.beginPath()
@@ -113,7 +116,7 @@ export function makePosterTexture(project: Project, accent: string, secondary: s
     ctx.fill()
   })
   for (let i = 0; i < 5; i++) {
-    ctx.fillStyle = i === 0 ? accent + 'cc' : '#ffffff' + (i % 2 ? '22' : '33')
+    ctx.fillStyle = i === 0 ? accent + 'cc' : (day ? '#1d1f24' : '#ffffff') + (i % 2 ? '18' : '26')
     ctx.fillRect(wx + 28, wy + 62 + i * 34, ww * (0.35 + rand() * 0.5), 14)
   }
   for (let i = 0; i < 6; i++) {
@@ -127,11 +130,11 @@ export function makePosterTexture(project: Project, accent: string, secondary: s
   ctx.fillStyle = accent
   ctx.font = '500 30px MuseumMono, monospace'
   ctx.fillText(`${number} — ${project.category.toUpperCase()}`, pad, H * 0.17)
-  ctx.fillStyle = '#f2f4fb'
+  ctx.fillStyle = ink
   ctx.font = '700 92px MuseumDisplay, sans-serif'
   const titleLines = wrap(ctx, project.title, W * 0.46, 3)
   titleLines.forEach((l, i) => ctx.fillText(l, pad, H * 0.3 + i * 96))
-  ctx.fillStyle = '#aab2c8'
+  ctx.fillStyle = sub
   ctx.font = '400 32px MuseumBody, sans-serif'
   wrap(ctx, project.tagline, W * 0.44, 3).forEach((l, i) => ctx.fillText(l, pad, H * 0.3 + titleLines.length * 96 + 16 + i * 44))
 
@@ -147,7 +150,7 @@ export function makePosterTexture(project: Project, accent: string, secondary: s
     ctx.beginPath()
     ctx.roundRect(cx, cy - 30, tw, 42, 21)
     ctx.stroke()
-    ctx.fillStyle = '#dfe6ff'
+    ctx.fillStyle = day ? '#2a2c31' : '#dfe6ff'
     ctx.fillText(t, cx + 14, cy)
     cx += tw + 12
   }

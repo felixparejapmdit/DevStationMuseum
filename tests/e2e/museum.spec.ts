@@ -28,10 +28,15 @@ test('enters the museum and shows the controls', async ({ page }) => {
 
 test('search opens a work and updates the URL', async ({ page }) => {
   await enter(page)
-  await page.keyboard.press('Control+k')
-  await page.getByPlaceholder(/Search works/).fill('pulseboard')
+  const input = page.getByPlaceholder(/Search works/)
+  // Software-rendered CI frames are slow: retry the shortcut until the palette is open.
+  await expect(async () => {
+    await page.keyboard.press('Control+k')
+    await expect(input).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  await input.fill('pulseboard')
   await page.keyboard.press('Enter')
-  await expect(page.getByRole('dialog', { name: /PulseBoard details/ })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('dialog', { name: /PulseBoard details/ })).toBeVisible({ timeout: 45_000 })
   await expect(page).toHaveURL(/\/museum\/[^/]+\/pulseboard$/)
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog', { name: /PulseBoard details/ })).toBeHidden()
@@ -50,6 +55,15 @@ test('back button closes a work without leaving the museum', async ({ page }) =>
   await page.goBack()
   await expect(page).toHaveURL(/\/museum\/construction-and-field$/)
   expect((await museum(page).info()).focused).toBeNull()
+})
+
+test('daylight by default, night mode toggles and persists', async ({ page }) => {
+  await enter(page)
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'day')
+  await page.getByRole('button', { name: 'Night mode' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night')
+  await page.goto('/projects')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night')
 })
 
 test('2D collection lists every work', async ({ page }) => {
